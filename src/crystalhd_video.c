@@ -67,7 +67,7 @@ static void crystalhd__information_message(const char *msg, ...)
 VAStatus crystalhd_QueryConfigProfiles(
 		VADriverContextP ctx,
 		VAProfile *profile_list,	/* out */
-		int *num_profiles			/* out */
+		int *num_profiles		/* out */
 	)
 {
 	INIT_DRIVER_DATA
@@ -1181,38 +1181,13 @@ VAStatus crystalhd_Terminate( VADriverContextP ctx )
 	}
 	object_heap_destroy( &driver_data->config_heap );
 
+	if (driver_data->hdev)
+		DtsDeviceClose(driver_data->hdev);
+
 	free(ctx->pDriverData);
 	ctx->pDriverData = NULL;
 
 	return VA_STATUS_SUCCESS;
-}
-
-static inline int crystalhd__hasCrystalHD(void)
-{
-	char line[1024];
-	int len, vendor, device, dummy, found = 0;
-	FILE *fp;
-
-	fp = fopen("/proc/bus/pci/devices", "r");
-	if (!fp)
-		return 0;
-
-	while (!found && fgets(line, sizeof(line), fp)) {
-		len = strlen(line);
-		if (len == 0)
-			continue;
-		line[len - 1] = 0;
-		if (sscanf(line, "%x %04x%04x", &dummy, &vendor, &device) == 3) {
-			if (vendor == 0x14e4) {
-				if (device == 0x1612 /* BCM70012 */ ||
-				    device == 0x1615 /* BCM70015 */ ) {
-					found = 1;
-				}
-			}
-		}
-	}
-	fclose(fp);
-	return found;
 }
 
 VAStatus __vaDriverInit_0_31(  VADriverContextP ctx )
@@ -1222,8 +1197,7 @@ VAStatus __vaDriverInit_0_31(  VADriverContextP ctx )
 	struct crystalhd_driver_data *driver_data;
 	int i;
 
-	if (!crystalhd__hasCrystalHD())
-		return VA_STATUS_ERROR_UNKNOWN;
+	BC_STATUS sts;
 
 	ctx->version_major = VA_MAJOR_VERSION;
 	ctx->version_minor = VA_MINOR_VERSION;
@@ -1282,6 +1256,11 @@ VAStatus __vaDriverInit_0_31(  VADriverContextP ctx )
 
 	driver_data = (struct crystalhd_driver_data *) malloc( sizeof(*driver_data) );
 	ctx->pDriverData = (void *) driver_data;
+
+	sts = DtsDeviceOpen(&(driver_data->hdev),
+			DTS_PLAYBACK_MODE | DTS_LOAD_FILE_PLAY_FW |
+			DTS_SKIP_TX_CHK_CPB | DTS_DFLT_RESOLUTION(vdecRESOLUTION_720p29_97));
+	assert( sts == BC_STS_SUCCESS );
 
 	result = object_heap_init( &driver_data->config_heap, sizeof(struct object_config), CONFIG_ID_OFFSET );
 	assert( result == 0 );

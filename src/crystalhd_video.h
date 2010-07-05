@@ -30,16 +30,18 @@
 #include <va/va.h>
 #include <va/va_backend.h>
 
+#include <libcrystalhd/bc_dts_defs.h>
+#include <libcrystalhd/libcrystalhd_if.h>
 #include <libcrystalhd/libcrystalhd_version.h>
 
 #include "object_heap.h"
 
 #define CRYSTALHD_MAX_PROFILES			11
-#define CRYSTALHD_MAX_ENTRYPOINTS			5
+#define CRYSTALHD_MAX_ENTRYPOINTS		5
 #define CRYSTALHD_MAX_CONFIG_ATTRIBUTES		10
 #define CRYSTALHD_MAX_IMAGE_FORMATS		5
 #define CRYSTALHD_MAX_SUBPIC_FORMATS		4
-#define CRYSTALHD_MAX_DISPLAY_ATTRIBUTES		4
+#define CRYSTALHD_MAX_DISPLAY_ATTRIBUTES	4
 #define CRYSTALHD_STR_VENDOR			"Broadcom Crystal HD Video Decoder " RC_PRODUCT_VERSION
 
 struct crystalhd_driver_data
@@ -48,6 +50,8 @@ struct crystalhd_driver_data
 	struct object_heap	context_heap;
 	struct object_heap	surface_heap;
 	struct object_heap	buffer_heap;
+
+	HANDLE			hdev;
 };
 
 struct object_config {
