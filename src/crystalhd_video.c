@@ -34,10 +34,10 @@
 
 #define INIT_DRIVER_DATA	struct crystalhd_driver_data *driver_data = (struct crystalhd_driver_data *) ctx->pDriverData;
 
-#define CONFIG(id)  ((object_config_p) object_heap_lookup( &driver_data->config_heap, id ))
-#define CONTEXT(id) ((object_context_p) object_heap_lookup( &driver_data->context_heap, id ))
+#define CONFIG(id)	((object_config_p) object_heap_lookup( &driver_data->config_heap, id ))
+#define CONTEXT(id)	((object_context_p) object_heap_lookup( &driver_data->context_heap, id ))
 #define SURFACE(id)	((object_surface_p) object_heap_lookup( &driver_data->surface_heap, id ))
-#define BUFFER(id)  ((object_buffer_p) object_heap_lookup( &driver_data->buffer_heap, id ))
+#define BUFFER(id)	((object_buffer_p) object_heap_lookup( &driver_data->buffer_heap, id ))
 
 #define CONFIG_ID_OFFSET		0x01000000
 #define CONTEXT_ID_OFFSET		0x02000000
@@ -426,8 +426,8 @@ VAStatus crystalhd_DestroySurfaces(
 
 VAStatus crystalhd_QueryImageFormats(
 	VADriverContextP ctx,
-	VAImageFormat *format_list,		/* out */
-	int *num_formats		   /* out */
+	VAImageFormat *format_list,	/* out */
+	int *num_formats		/* out */
 )
 {
 	INIT_DRIVER_DATA
@@ -441,7 +441,7 @@ VAStatus crystalhd_CreateImage(
 	VAImageFormat *format,
 	int width,
 	int height,
-	VAImage *image	 /* out */
+	VAImage *image			/* out */
 )
 {
 	INIT_DRIVER_DATA
@@ -453,7 +453,7 @@ VAStatus crystalhd_CreateImage(
 VAStatus crystalhd_DeriveImage(
 	VADriverContextP ctx,
 	VASurfaceID surface,
-	VAImage *image	 /* out */
+	VAImage *image			/* out */
 )
 {
 	INIT_DRIVER_DATA
@@ -488,9 +488,9 @@ VAStatus crystalhd_SetImagePalette(
 VAStatus crystalhd_GetImage(
 	VADriverContextP ctx,
 	VASurfaceID surface,
-	int x,	 /* coordinates of the upper left source pixel */
+	int x,			/* coordinates of the upper left source pixel */
 	int y,
-	unsigned int width, /* width and height of the region */
+	unsigned int width,	/* width and height of the region */
 	unsigned int height,
 	VAImageID image
 )
@@ -524,9 +524,9 @@ VAStatus crystalhd_PutImage(
 
 VAStatus crystalhd_QuerySubpictureFormats(
 	VADriverContextP ctx,
-	VAImageFormat *format_list,		/* out */
-	unsigned int *flags,	   /* out */
-	unsigned int *num_formats  /* out */
+	VAImageFormat *format_list,	/* out */
+	unsigned int *flags,		/* out */
+	unsigned int *num_formats	/* out */
 )
 {
 	INIT_DRIVER_DATA
@@ -538,7 +538,7 @@ VAStatus crystalhd_QuerySubpictureFormats(
 VAStatus crystalhd_CreateSubpicture(
 	VADriverContextP ctx,
 	VAImageID image,
-	VASubpictureID *subpicture   /* out */
+	VASubpictureID *subpicture	/* out */
 )
 {
 	INIT_DRIVER_DATA
@@ -772,13 +772,13 @@ static VAStatus crystalhd__allocate_buffer(object_buffer_p obj_buffer, int size)
 
 VAStatus crystalhd_CreateBuffer(
 		VADriverContextP ctx,
-				VAContextID context,	/* in */
-				VABufferType type,	/* in */
-				unsigned int size,		/* in */
-				unsigned int num_elements,	/* in */
-				void *data,			/* in */
-				VABufferID *buf_id		/* out */
-)
+		VAContextID context,		/* in */
+		VABufferType type,		/* in */
+		unsigned int size,		/* in */
+		unsigned int num_elements,	/* in */
+		void *data,			/* in */
+		VABufferID *buf_id		/* out */
+	)
 {
 	INIT_DRIVER_DATA
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
@@ -837,7 +837,7 @@ VAStatus crystalhd_CreateBuffer(
 
 VAStatus crystalhd_BufferSetNumElements(
 		VADriverContextP ctx,
-		VABufferID buf_id,	/* in */
+		VABufferID buf_id,		/* in */
 		unsigned int num_elements	/* in */
 	)
 {
