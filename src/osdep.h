@@ -21,15 +21,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02111, USA.
  *****************************************************************************/
 
-#ifndef X264_OSDEP_H
-#define X264_OSDEP_H
+#ifndef H264_OSDEP_H
+#define H264_OSDEP_H
 
 #define _LARGEFILE_SOURCE 1
 #define _FILE_OFFSET_BITS 64
 #include <stdio.h>
 #include <sys/stat.h>
-
-#include "config.h"
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -148,7 +146,7 @@ static inline int x264_pthread_create( x264_pthread_t *t, void *a, void *(*f)(vo
 #define x264_pthread_attr_t          pthread_attr_t
 #define x264_pthread_attr_init       pthread_attr_init
 #define x264_pthread_attr_destroy    pthread_attr_destroy
-#define X264_PTHREAD_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
+#define H264_PTHREAD_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 #else
 #define x264_pthread_mutex_t         int
 #define x264_pthread_mutex_init(m,f) 0
@@ -163,7 +161,7 @@ static inline int x264_pthread_create( x264_pthread_t *t, void *a, void *(*f)(vo
 #define x264_pthread_attr_t          int
 #define x264_pthread_attr_init(a)    0
 #define x264_pthread_attr_destroy(a)
-#define X264_PTHREAD_MUTEX_INITIALIZER 0
+#define H264_PTHREAD_MUTEX_INITIALIZER 0
 #endif
 
 #define WORD_SIZE sizeof(void*)
@@ -294,4 +292,4 @@ static inline uint8_t x264_is_regular_file( FILE *filehandle )
     return S_ISREG( file_stat.st_mode );
 }
 
-#endif /* X264_OSDEP_H */
+#endif /* H264_OSDEP_H */

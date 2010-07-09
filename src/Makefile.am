@@ -17,24 +17,27 @@ source_x11_c = crystalhd_video_x11.c
 
 source_h =			\
 	bitstream.h		\
-	h264.h			\
+	debug.h			\
+	crystalhd_video_h264.h	\
 	object_heap.h		\
 	osdep.h			\
-	crystalhd_video.h	\
+	crystalhd_drv_video.h	\
 	$(source_glx_h)		\
 	$(source_x11_h)
 
 source_c =			\
+	crystalhd_drv_video.c	\
+	crystalhd_video_h264.c	\
+	debug.c			\
 	object_heap.c		\
-	crystalhd_video.c	\
 	$(source_glx_c)		\
 	$(source_x11_c)
 
 crystalhd_drv_video_la_LTLIBRARIES	= crystalhd_drv_video.la
 crystalhd_drv_video_ladir		= @LIBVA_DRIVERS_PATH@
-crystalhd_drv_video_la_SOURCES	= $(source_c)
-crystalhd_drv_video_la_LIBADD	= $(CRYSTALHD_VIDEO_LIBS) -lX11
-crystalhd_drv_video_la_LDFLAGS	= $(LDADD)
+crystalhd_drv_video_la_SOURCES		= $(source_c)
+crystalhd_drv_video_la_LIBADD		= $(CRYSTALHD_VIDEO_LIBS) -lX11
+crystalhd_drv_video_la_LDFLAGS		= $(LDADD)
 
 noinst_HEADERS = $(source_h)
 

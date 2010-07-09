@@ -51,6 +51,23 @@
 #define STRIDE(w)		(((w) + 0xf) & ~0xf)
 #define SIZE_YUV420(w, h)	((h) * (STRIDE(w) + STRIDE((w) >> 1)))
 
+#define CRYSTALHD_MIN(a, b)	(((a) < (b)) ? (a) : (b))
+#define CRYSTALHD_MAX(a, b)	(((a) > (b)) ? (a) : (b))
+#define CRYSTALHD_MIN3(a, b, c)	CRYSTALHD_MIN((a), (CRYSTALHD_MIN((b), (c))))
+#define CRYSTALHD_MAX3(a, b, c)	CRYSTALHD_MAX((a), (CRYSTALHD_MAX((b), (c))))
+
+#define INIT_DRIVER_DATA	struct crystalhd_driver_data *driver_data = (struct crystalhd_driver_data *) ctx->pDriverData;
+
+#define CONFIG(id)	((object_config_p) object_heap_lookup( &driver_data->config_heap, id ))
+#define CONTEXT(id)	((object_context_p) object_heap_lookup( &driver_data->context_heap, id ))
+#define SURFACE(id)	((object_surface_p) object_heap_lookup( &driver_data->surface_heap, id ))
+#define BUFFER(id)	((object_buffer_p) object_heap_lookup( &driver_data->buffer_heap, id ))
+#define IMAGE(id)	((object_image_p) object_heap_lookup( &driver_data->image_heap, id ))
+
+#define INSTRUMENT_CALL			crystalhd__information_message("%s (#%d): being called\n", __func__, __LINE__);
+#define INSTRUMENT_RET			crystalhd__information_message("%s (#%d): returned\n", __func__, __LINE__);
+#define INSTRUMENT_CHECKPOINT(n)	crystalhd__information_message("%s (#%d): checkpoint %d\n", __func__, __LINE__, n);
+
 struct crystalhd_driver_data
 {
 	struct object_heap	config_heap;
@@ -118,5 +135,8 @@ crystalhd_driver_data(VADriverContextP ctx)
 {
 	return (struct crystalhd_driver_data *)ctx->pDriverData;
 }
+
+/* FIXME: dirty hack of global variable */
+object_buffer_p buffered_picture_parameter_buffer;
 
 #endif

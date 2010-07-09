@@ -24,7 +24,42 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef _CRYSTALHD_VIDEO_X11_
-#define _CRYSTALHD_VIDEO_X11_
+#ifdef HAVE_CONFIG
+# include "config.h"
+#endif
 
+#include "debug.h"
+
+#ifdef USE_DEBUG
+inline void
+crystalhd__print_buffer(uint8_t *data, uint32_t size)
+{
+	unsigned int i = 0;
+	printf("printing buffer with size 0x%x\n", size);
+	for (i = 0;i < size; ++i)
+		printf("0x%02x ", data[i]);
+	printf("\n=====\n");
+}
+
+inline void
+crystalhd__error_message(const char *msg, ...)
+{
+	va_list args;
+
+	fprintf(stderr, "crystalhd_drv_video error: ");
+	va_start(args, msg);
+	vfprintf(stderr, msg, args);
+	va_end(args);
+}
+
+inline void
+crystalhd__information_message(const char *msg, ...)
+{
+	va_list args;
+
+	fprintf(stderr, "crystalhd_drv_video: ");
+	va_start(args, msg);
+	vfprintf(stderr, msg, args);
+	va_end(args);
+}
 #endif

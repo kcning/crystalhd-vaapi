@@ -24,7 +24,9 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "crystalhd_video.h"
+#ifdef HAVE_CONFIG
+# include "config.h"
+#endif
 
 #include <assert.h>
 #include <stdio.h>
@@ -32,13 +34,10 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define INIT_DRIVER_DATA	struct crystalhd_driver_data *driver_data = (struct crystalhd_driver_data *) ctx->pDriverData;
+#include "crystalhd_drv_video.h"
+#include "crystalhd_video_h264.h"
 
-#define CONFIG(id)	((object_config_p) object_heap_lookup( &driver_data->config_heap, id ))
-#define CONTEXT(id)	((object_context_p) object_heap_lookup( &driver_data->context_heap, id ))
-#define SURFACE(id)	((object_surface_p) object_heap_lookup( &driver_data->surface_heap, id ))
-#define BUFFER(id)	((object_buffer_p) object_heap_lookup( &driver_data->buffer_heap, id ))
-#define IMAGE(id)	((object_image_p) object_heap_lookup( &driver_data->image_heap, id ))
+#include "debug.h"
 
 #define CONFIG_ID_OFFSET		0x01000000
 #define CONTEXT_ID_OFFSET		0x02000000
@@ -46,91 +45,29 @@
 #define BUFFER_ID_OFFSET		0x08000000
 #define IMAGE_ID_OFFSET			0x10000000
 
-#define INSTRUMENT_CALL	crystalhd__information_message("%s (#%d): being called\n", __func__, __LINE__);
-#define INSTRUMENT_RET	crystalhd__information_message("%s (#%d): returned\n", __func__, __LINE__);
-#define INSTRUMENT_CHECKPOINT(n) crystalhd__information_message("%s (#%d): checkpoint %d\n", __func__, __LINE__, n);
+enum {
+	CRYSTALHD_SURFACETYPE_RGBA = 1,
+	CRYSTALHD_SURFACETYPE_YUV,
+	CRYSTALHD_SURFACETYPE_INDEXED,
+};
 
 typedef struct {
-	int level_idc;
-	int mbps;		/* max macroblock processing rate (macroblocks/sec) */
-	int frame_size;		/* max frame size (macroblocks) */
-	int dpb;		/* max decoded picture buffer (bytes) */
-	int bitrate;		/* max bitrate (kbit/sec) */
-	int cpb;		/* max vbv buffer (kbit) */
-	int mv_range;		/* max vertical mv component range (pixels) */
-	int mvs_per_2mb;	/* max mvs per 2 consecutive mbs. */
-	int slice_rate;		/* ?? */
-	int mincr;		/* min compression ratio */
-	int bipred8x8;		/* limit bipred to >=8x8 */
-	int direct8x8;		/* limit b_direct to >=8x8 */
-	int frame_only;		/* forbid interlacing */
-} h264_level_t;
+	unsigned int type;
+	VAImageFormat va_format;
+} crystalhd_image_format_map_t;
 
-static const h264_level_t h264_levels[] =
-{
-	{ 10,   1485,    99,   152064,     64,    175,  64, 64,  0, 2, 0, 0, 1 },
-	{ 11,   3000,   396,   345600,    192,    500, 128, 64,  0, 2, 0, 0, 1 },
-	{ 12,   6000,   396,   912384,    384,   1000, 128, 64,  0, 2, 0, 0, 1 },
-	{ 13,  11880,   396,   912384,    768,   2000, 128, 64,  0, 2, 0, 0, 1 },
-	{ 20,  11880,   396,   912384,   2000,   2000, 128, 64,  0, 2, 0, 0, 1 },
-	{ 21,  19800,   792,  1824768,   4000,   4000, 256, 64,  0, 2, 0, 0, 0 },
-	{ 22,  20250,  1620,  3110400,   4000,   4000, 256, 64,  0, 2, 0, 0, 0 },
-	{ 30,  40500,  1620,  3110400,  10000,  10000, 256, 32, 22, 2, 0, 1, 0 },
-	{ 31, 108000,  3600,  6912000,  14000,  14000, 512, 16, 60, 4, 1, 1, 0 },
-	{ 32, 216000,  5120,  7864320,  20000,  20000, 512, 16, 60, 4, 1, 1, 0 },
-	{ 40, 245760,  8192, 12582912,  20000,  25000, 512, 16, 60, 4, 1, 1, 0 },
-	{ 41, 245760,  8192, 12582912,  50000,  62500, 512, 16, 24, 2, 1, 1, 0 },
-	{ 42, 522240,  8704, 13369344,  50000,  62500, 512, 16, 24, 2, 1, 1, 1 },
-	{ 50, 589824, 22080, 42393600, 135000, 135000, 512, 16, 24, 2, 1, 1, 1 },
-	{ 51, 983040, 36864, 70778880, 240000, 240000, 512, 16, 24, 2, 1, 1, 1 },
-	{ 0 }
+static const crystalhd_image_format_map_t
+crystalhd_image_formats_map[CRYSTALHD_MAX_IMAGE_FORMATS + 1] = {
+#if 0
+	/* TODO: support these image formats... and maybe more */
+	{ CRYSTALHD_SURFACETYPE_YUV,
+	  { VA_FOURCC('Y','V','1','2'), VA_LSB_FIRST, 12, } },
+	{ CRYSTALHD_SURFACETYPE_YUV,
+	  { VA_FOURCC('I','4','2','0'), VA_LSB_FIRST, 12, } },
+#endif
+	{ CRYSTALHD_SURFACETYPE_YUV,
+	  { VA_FOURCC('N','V','1','2'), VA_LSB_FIRST, 12, } },
 };
-
-enum profile_e
-{
-	H264_PROFILE_BASELINE		= 66,
-	H264_PROFILE_MAIN		= 77,
-	H264_PROFILE_EXTENDED		= 88,
-	H264_PROFILE_HIGH		= 100,
-	H264_PROFILE_HIGH10		= 110,
-	H264_PROFILE_HIGH422		= 122,
-	H264_PROFILE_HIGH444		= 144,
-	H264_PROFILE_HIGH444_PREDICTIVE	= 244,
-};
-
-#define CRYSTALHD_MIN(a, b)	(((a) < (b)) ? (a) : (b))
-#define CRYSTALHD_MAX(a, b)	(((a) > (b)) ? (a) : (b))
-#define CRYSTALHD_MAX3(a, b, c)	CRYSTALHD_MAX((a), CRYSTALHD_MAX((b), (c)))
-
-#define DUMP_BUFFER(BUF, SIZE, FILENAME, ...) \
-	do { \
-		char dump_buf_file[200] = { 0 }; \
-		sprintf(dump_buf_file, FILENAME, __VA_ARGS__); \
-		FILE * dump_buf = fopen(dump_buf_file, "w"); \
-		if (fwrite(BUF, SIZE, 1, dump_buf) < 0) \
-			crystalhd__error_message("cannot dump buffer to %s\n", dump_buf_file); \
-		fclose(dump_buf); \
-	} while (0);
-
-static void crystalhd__error_message(const char *msg, ...)
-{
-	va_list args;
-
-	fprintf(stderr, "crystalhd_drv_video error: ");
-	va_start(args, msg);
-	vfprintf(stderr, msg, args);
-	va_end(args);
-}
-
-static void crystalhd__information_message(const char *msg, ...)
-{
-	va_list args;
-
-	fprintf(stderr, "crystalhd_drv_video: ");
-	va_start(args, msg);
-	vfprintf(stderr, msg, args);
-	va_end(args);
-}
 
 VAStatus crystalhd_QueryConfigProfiles(
 		VADriverContextP ctx,
@@ -139,7 +76,6 @@ VAStatus crystalhd_QueryConfigProfiles(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	int i = 0;
 
 	//profile_list[i++] = VAProfileMPEG2Simple;
@@ -160,7 +96,6 @@ VAStatus crystalhd_QueryConfigProfiles(
 	assert(i <= CRYSTALHD_MAX_PROFILES);
 	*num_profiles = i;
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -172,9 +107,9 @@ VAStatus crystalhd_QueryConfigEntrypoints(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 
 	switch (profile) {
+#if 0
 		case VAProfileMPEG2Simple:
 		case VAProfileMPEG2Main:
 				*num_entrypoints = 2;
@@ -188,7 +123,7 @@ VAStatus crystalhd_QueryConfigEntrypoints(
 				*num_entrypoints = 1;
 				entrypoint_list[0] = VAEntrypointVLD;
 				break;
-
+#endif
 		case VAProfileH264Baseline:
 		case VAProfileH264Main:
 		case VAProfileH264High:
@@ -196,6 +131,7 @@ VAStatus crystalhd_QueryConfigEntrypoints(
 				entrypoint_list[0] = VAEntrypointVLD;
 				break;
 
+#if 0
 		case VAProfileVC1Simple:
 		case VAProfileVC1Main:
 		case VAProfileVC1Advanced:
@@ -203,15 +139,16 @@ VAStatus crystalhd_QueryConfigEntrypoints(
 				entrypoint_list[0] = VAEntrypointVLD;
 				break;
 
-//		case VAProfileH263Baseline:
-//				*num_entrypoints = 1;
-//				entrypoint_list[0] = VAEntrypointVLD;
-//				break;
-//
-//		case VAProfileJPEGBaseline:
-//				*num_entrypoints = 1;
-//				entrypoint_list[0] = VAEntrypointVLD;
-//				break;
+		case VAProfileH263Baseline:
+				*num_entrypoints = 1;
+				entrypoint_list[0] = VAEntrypointVLD;
+				break;
+
+		case VAProfileJPEGBaseline:
+				*num_entrypoints = 1;
+				entrypoint_list[0] = VAEntrypointVLD;
+				break;
+#endif
 
 		default:
 				*num_entrypoints = 0;
@@ -220,7 +157,7 @@ VAStatus crystalhd_QueryConfigEntrypoints(
 
 	/* If the assert fails then CRYSTALHD_MAX_ENTRYPOINTS needs to be bigger */
 	assert(*num_entrypoints <= CRYSTALHD_MAX_ENTRYPOINTS);
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -268,7 +205,6 @@ static VAStatus crystalhd__update_attribute(object_config_p obj_config, VAConfig
 		{
 			/* Update existing attribute */
 			obj_config->attrib_list[i].value = attrib->value;
-			INSTRUMENT_RET;
 			return VA_STATUS_SUCCESS;
 		}
 	}
@@ -278,10 +214,8 @@ static VAStatus crystalhd__update_attribute(object_config_p obj_config, VAConfig
 		obj_config->attrib_list[i].type = attrib->type;
 		obj_config->attrib_list[i].value = attrib->value;
 		obj_config->attrib_count++;
-		INSTRUMENT_RET;
 		return VA_STATUS_SUCCESS;
 	}
-	INSTRUMENT_RET;
 	return VA_STATUS_ERROR_MAX_NUM_EXCEEDED;
 }
 
@@ -303,61 +237,64 @@ VAStatus crystalhd_CreateConfig(
 
 	/* Validate profile & entrypoint */
 	switch (profile) {
-		case VAProfileMPEG2Simple:
-		case VAProfileMPEG2Main:
-				if ((VAEntrypointVLD == entrypoint) ||
-					(VAEntrypointMoComp == entrypoint))
-				{
-					vaStatus = VA_STATUS_SUCCESS;
-				}
-				else
-				{
-					vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
-				}
-				break;
+#if 0
+	case VAProfileMPEG2Simple:
+	case VAProfileMPEG2Main:
+		if ((VAEntrypointVLD == entrypoint) ||
+			(VAEntrypointMoComp == entrypoint))
+		{
+			vaStatus = VA_STATUS_SUCCESS;
+		}
+		else
+		{
+			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
+		}
+		break;
 
-		case VAProfileMPEG4Simple:
-		case VAProfileMPEG4AdvancedSimple:
-		case VAProfileMPEG4Main:
-				if (VAEntrypointVLD == entrypoint)
-				{
-					vaStatus = VA_STATUS_SUCCESS;
-				}
-				else
-				{
-					vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
-				}
-				break;
+	case VAProfileMPEG4Simple:
+	case VAProfileMPEG4AdvancedSimple:
+	case VAProfileMPEG4Main:
+		if (VAEntrypointVLD == entrypoint)
+		{
+			vaStatus = VA_STATUS_SUCCESS;
+		}
+		else
+		{
+			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
+		}
+		break;
+#endif
+	case VAProfileH264Baseline:
+	case VAProfileH264Main:
+	case VAProfileH264High:
+		if (VAEntrypointVLD == entrypoint)
+		{
+			vaStatus = VA_STATUS_SUCCESS;
+		}
+		else
+		{
+			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
+		}
+		break;
 
-		case VAProfileH264Baseline:
-		case VAProfileH264Main:
-		case VAProfileH264High:
-				if (VAEntrypointVLD == entrypoint)
-				{
-					vaStatus = VA_STATUS_SUCCESS;
-				}
-				else
-				{
-					vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
-				}
-				break;
+#if 0
+	case VAProfileVC1Simple:
+	case VAProfileVC1Main:
+	case VAProfileVC1Advanced:
+		if (VAEntrypointVLD == entrypoint)
+		{
+			vaStatus = VA_STATUS_SUCCESS;
+		}
+		else
+		{
+			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
+		}
+		break;
 
-		case VAProfileVC1Simple:
-		case VAProfileVC1Main:
-		case VAProfileVC1Advanced:
-				if (VAEntrypointVLD == entrypoint)
-				{
-					vaStatus = VA_STATUS_SUCCESS;
-				}
-				else
-				{
-					vaStatus = VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT;
-				}
-				break;
-
-		default:
-				vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
-				break;
+	default:
+		vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
+		break;
+#endif
 	}
 
 	if (VA_STATUS_SUCCESS != vaStatus)
@@ -536,30 +473,6 @@ VAStatus crystalhd_DestroySurfaces(
 	return VA_STATUS_SUCCESS;
 }
 
-enum {
-	CRYSTALHD_SURFACETYPE_RGBA = 1,
-	CRYSTALHD_SURFACETYPE_YUV,
-	CRYSTALHD_SURFACETYPE_INDEXED,
-};
-
-typedef struct {
-	unsigned int type;
-	VAImageFormat va_format;
-} crystalhd_image_format_map_t;
-
-static const crystalhd_image_format_map_t
-crystalhd_image_formats_map[CRYSTALHD_MAX_IMAGE_FORMATS + 1] = {
-#if 0
-	/* TODO: support these image formats... and maybe more */
-	{ CRYSTALHD_SURFACETYPE_YUV,
-	  { VA_FOURCC('Y','V','1','2'), VA_LSB_FIRST, 12, } },
-	{ CRYSTALHD_SURFACETYPE_YUV,
-	  { VA_FOURCC('I','4','2','0'), VA_LSB_FIRST, 12, } },
-#endif
-	{ CRYSTALHD_SURFACETYPE_YUV,
-	  { VA_FOURCC('N','V','1','2'), VA_LSB_FIRST, 12, } },
-};
-
 VAStatus crystalhd_QueryImageFormats(
 	VADriverContextP ctx,
 	VAImageFormat *format_list,	/* out */
@@ -579,7 +492,6 @@ VAStatus crystalhd_QueryImageFormats(
 	if (num_formats)
 		*num_formats = n;
 
-	/* TODO */
 	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
@@ -1055,7 +967,7 @@ VAStatus crystalhd_CreateContext(
 		case VAProfileH264High:
 			bc_algo = BC_VID_ALGO_H264;
 			break;
-
+#if 0
 		case VAProfileMPEG2Simple:
 		case VAProfileMPEG2Main:
 			bc_algo = BC_VID_ALGO_MPEG2;
@@ -1065,15 +977,15 @@ VAStatus crystalhd_CreateContext(
 			bc_algo = BC_VID_ALGO_VC1;
 			break;
 
-		//case VAProfileDivx???:
-		//	bc_algo = BC_VID_ALGO_DIVX;
-		//	break;
+		case VAProfileDivx???:
+			bc_algo = BC_VID_ALGO_DIVX;
+			break;
 
 		case VAProfileVC1Main:
 		case VAProfileVC1Advanced:
 			bc_algo = BC_VID_ALGO_VC1MP;
 			break;
-
+#endif
 		default:
 			INSTRUMENT_RET;
 			return VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
@@ -1137,8 +1049,6 @@ VAStatus crystalhd_DestroyContext(
 	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
-
-
 
 static VAStatus crystalhd__allocate_buffer(object_buffer_p obj_buffer, int size)
 {
@@ -1244,29 +1154,29 @@ VAStatus crystalhd_BufferSetNumElements(
 
 VAStatus crystalhd_MapBuffer(
 		VADriverContextP ctx,
-		VABufferID buf_id,	/* in */
+		VABufferID buffer_id,	/* in */
 		void **pbuf		/* out */
 	)
 {
 	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
-	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
-	object_buffer_p obj_buffer = BUFFER(buf_id);
-	assert(obj_buffer);
+	object_buffer_p obj_buffer = BUFFER(buffer_id);
+
 	if (NULL == obj_buffer)
 	{
-		vaStatus = VA_STATUS_ERROR_INVALID_BUFFER;
 		INSTRUMENT_RET;
-		return vaStatus;
+		return VA_STATUS_ERROR_INVALID_BUFFER;
 	}
 
 	if (NULL != obj_buffer->buffer_data)
 	{
 		*pbuf = obj_buffer->buffer_data;
-		vaStatus = VA_STATUS_SUCCESS;
 	}
+	//crystalhd__information_message("%s: id: 0x%08d, data: 0x%08d, pbuf: 0x%08d, *pbuf: 0x%08d", __func__,
+	//		buffer_id, obj_buffer->buffer_data, pbuf, *pbuf);
+
 	INSTRUMENT_RET;
-	return vaStatus;
+	return VA_STATUS_SUCCESS;
 }
 
 VAStatus crystalhd_UnmapBuffer(
@@ -1280,7 +1190,6 @@ VAStatus crystalhd_UnmapBuffer(
 
 static void crystalhd__destroy_buffer(struct crystalhd_driver_data *driver_data, object_buffer_p obj_buffer)
 {
-	INSTRUMENT_CALL;
 	if (NULL != obj_buffer->buffer_data)
 	{
 		free(obj_buffer->buffer_data);
@@ -1288,7 +1197,6 @@ static void crystalhd__destroy_buffer(struct crystalhd_driver_data *driver_data,
 	}
 
 	object_heap_free( &driver_data->buffer_heap, (object_base_p) obj_buffer);
-	INSTRUMENT_RET;
 }
 
 VAStatus crystalhd_DestroyBuffer(
@@ -1297,15 +1205,11 @@ VAStatus crystalhd_DestroyBuffer(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	object_buffer_p obj_buffer = BUFFER(buffer_id);
-	crystalhd__information_message("buffer_id = %d (0x%08x), obj_buffer = 0x%08x\n", buffer_id, buffer_id, obj_buffer);
-	//assert(obj_buffer);
 
 	if (obj_buffer)
 		crystalhd__destroy_buffer(driver_data, obj_buffer);
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -1330,41 +1234,7 @@ VAStatus crystalhd_BeginPicture(
 	return vaStatus;
 }
 
-#include "bitstream.h"
-enum NALU
-{
-	NAL_DISPOSABLE_EOSEQ	= 0x0a,
-	NAL_HIGHEST_SLICE_IDR	= 0x65,
-	NAL_HIGHEST_SPS		= 0x67,
-	NAL_HIGHEST_PPS		= 0x68,
-};
-
-void print_buffer(uint8_t *data, uint32_t size)
-{
-	unsigned int i = 0;
-	printf("printing buffer with size 0x%x\n", size);
-	for (i = 0;i < size; ++i)
-		printf("0x%02x ", data[i]);
-	printf("\n=====\n");
-}
-
-/* FIXME: dirty hack of global variable */
-object_buffer_p buffered_picture_parameter_buffer;
-
-VAStatus crystalhd_render_picture_parameter_buffer_h264(
-		VADriverContextP ctx,
-		object_context_p obj_context,
-		object_buffer_p obj_buffer
-	)
-{
-	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
-	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
-	buffered_picture_parameter_buffer = obj_buffer;
-	INSTRUMENT_RET;
-	return VA_STATUS_SUCCESS;
-}
-
+#if 0
 VAStatus crystalhd_render_picture_parameter_buffer_mpeg2(
 		VADriverContextP ctx,
 		object_context_p obj_context,
@@ -1406,6 +1276,7 @@ VAStatus crystalhd_render_picture_parameter_buffer_vc1mp(
 	INSTRUMENT_RET;
 	return vaStatus;
 }
+#endif
 
 VAStatus crystalhd_render_picture_parameter_buffer(
 		VADriverContextP ctx,
@@ -1424,7 +1295,7 @@ VAStatus crystalhd_render_picture_parameter_buffer(
 		case VAProfileH264High:
 			vaStatus = crystalhd_render_picture_parameter_buffer_h264(ctx, obj_context, obj_buffer);
 			break;
-
+#if 0
 		case VAProfileMPEG2Simple:
 		case VAProfileMPEG2Main:
 			vaStatus = crystalhd_render_picture_parameter_buffer_mpeg2(ctx, obj_context, obj_buffer);
@@ -1434,265 +1305,19 @@ VAStatus crystalhd_render_picture_parameter_buffer(
 			vaStatus = crystalhd_render_picture_parameter_buffer_vc1(ctx, obj_context, obj_buffer);
 			break;
 
-		//case VAProfileDivx???:
-		//	vaStatus = crystalhd_render_picture_parameter_buffer_divx(ctx, obj_context, obj_buffer);
-		//	break;
+		case VAProfileDivx???:
+			vaStatus = crystalhd_render_picture_parameter_buffer_divx(ctx, obj_context, obj_buffer);
+			break;
 
 		case VAProfileVC1Main:
 		case VAProfileVC1Advanced:
 			vaStatus = crystalhd_render_picture_parameter_buffer_vc1mp(ctx, obj_context, obj_buffer);
 			break;
-
+#endif
 		default:
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 
-	INSTRUMENT_RET;
-	return vaStatus;
-}
-
-static inline int h264_validate_levels(
-		int profile_idc,
-		int level_idc,
-		VAPictureParameterBufferH264 * const pic_param,
-		VASliceParameterBufferH264 * const slice_param
-	)
-{
-	int mbs = (pic_param->picture_width_in_mbs_minus1 + 1) *
-		  (pic_param->picture_height_in_mbs_minus1 + 1);
-	int dpb = mbs * 384 * CRYSTALHD_MIN(16,
-			CRYSTALHD_MAX3(pic_param->num_ref_frames, pic_param->frame_num, 5));
-	int cpb_factor = (profile_idc == H264_PROFILE_HIGH) ? 5 : 4 ;
-
-
-	const h264_level_t *l = h264_levels;
-	while ( l->level_idc != 0 && l->level_idc != level_idc )
-		++l;
-
-	if ( l->frame_size < mbs ||
-	     l->frame_size * 8 < (pic_param->picture_width_in_mbs_minus1 + 1) * (pic_param->picture_width_in_mbs_minus1 + 1) ||
-	     l->frame_size * 8 < (pic_param->picture_height_in_mbs_minus1 + 1) * (pic_param->picture_height_in_mbs_minus1 + 1) )
-		return 1;
-
-	if (dpb > l->dpb )
-		return 1;
-
-	/* vbv_bitrate? */
-	//if ( ((l->bitrate * cbp_factor) / 4) < (???) )
-	//	return 1;
-	
-	/* vbv_buffer? */
-	/* mv_range? */
-	/* interlaced? */
-	/* fake_interlaced? */
-	/* fps_den? */
-
-	return 0;
-}
-
-static inline int h264_get_level_idc(
-		int profile_idc,
-		VAPictureParameterBufferH264 * const pic_param,
-		VASliceParameterBufferH264 * const slice_param
-	)
-{
-	const h264_level_t *l = h264_levels;
-
-	while (l[1].level_idc && h264_validate_levels(profile_idc, l->level_idc, pic_param, slice_param))
-		++l;
-
-	if (l->level_idc)
-		++l;
-
-	return l->level_idc;
-}
-
-VAStatus crystalhd_render_slice_parameter_buffer_h264(
-		VADriverContextP ctx,
-		object_context_p obj_context,
-		object_buffer_p obj_buffer
-	)
-{
-	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
-	VAStatus vaStatus = VA_STATUS_SUCCESS;
-	uint8_t data[3000] = { 0x00 };
-	bs_t bs;
-	bs_t *s = &bs;
-	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
-	VAPictureParameterBufferH264 * const pic_param = ((object_buffer_p)buffered_picture_parameter_buffer)->buffer_data;
-	VASliceParameterBufferH264 * const slice_param = obj_buffer->buffer_data;
-
-	bs_init( s, data, sizeof(data) / sizeof(*data) );
-
-	/* SPS header */
-	bs_realign( s );
-	
-	bs_write( s, 24, 0x000001 );						/* start_code */
-	bs_write( s, 8, NAL_HIGHEST_SPS );					/* nal */
-
-	int profile_idc;
-	if (pic_param->pic_fields.bits.transform_8x8_mode_flag)
-	{
-		profile_idc = H264_PROFILE_HIGH;
-	}
-	else if (slice_param->cabac_init_idc ||
-		 pic_param->pic_fields.bits.weighted_pred_flag )
-	{
-		profile_idc = H264_PROFILE_MAIN;
-	}
-	else
-	{
-		profile_idc = H264_PROFILE_BASELINE;
-	}
-	bs_write( s, 8, profile_idc );						/* profile idc */
-	bs_write( s, 1, profile_idc == H264_PROFILE_BASELINE );			/* constraint_set0 */
-	bs_write( s, 1, profile_idc <= H264_PROFILE_MAIN );			/* constraint_set1 */
-	bs_write( s, 1, 0 );							/* constraint_set2 */
-	bs_write( s, 5, 0 );							/* reserved */
-	bs_write( s, 8, h264_get_level_idc(
-				profile_idc, pic_param, slice_param) );		/* level_idc */
-	bs_write_ue( s, 0x00 );							/* sps_id */
-
-	if ( profile_idc >= H264_PROFILE_HIGH )
-	{
-		bs_write_ue( s, pic_param->seq_fields.bits.chroma_format_idc );	/* chroma_format_idc */
-		bs_write_ue( s, pic_param->bit_depth_luma_minus8 );		/* bit_depth_luma_minus8 */
-		bs_write_ue( s, pic_param->bit_depth_chroma_minus8 );		/* bit_depth_chroma_minus8 */
-		bs_write( s, 1, 1 );						/* qpprime_y_zero_transform_bypass */
-		bs_write( s, 1, 0 );						/* seq_scaling_matrix_present_flag */
-	}
-
-	bs_write_ue( s, pic_param->seq_fields.bits.log2_max_frame_num_minus4 );	/* log2_max_frame_num_minus4 */
-	bs_write_ue( s, pic_param->seq_fields.bits.pic_order_cnt_type );	/* pic_order_cnt_type */
-	if ( pic_param->seq_fields.bits.pic_order_cnt_type == 0 )
-	{
-		bs_write_ue( s, pic_param->seq_fields.bits.log2_max_pic_order_cnt_lsb_minus4 );
-										/* log2_max_pic_order_cnt_lsb_minus4 */
-	}
-#if 0
-	/* TODO */
-	else if ( pic_param->seq_fields.bits.pic_order_cnt_type == 1 )
-	{
-		int i;
-		bs_write( s, 1, pic_param->seq_fields.bits.delta_pic_order_always_zero_flag );
-										/* delta_pic_order_always_zero_flag */
-		bs_write_se( s, offset_for_non_ref_pic );			/* offset_for_non_ref_pic */
-		bs_write_se( s, offset_for_top_to_bottom_field );		/* offset_for_top_to_bottom_field */
-		bs_write_ue( s, num_ref_frames_in_poc_cycle );			/* num_ref_frames_in_poc_cycle */
-
-		for ( i = 0; i < num_ref_frames_in_poc_cycle; i++ )
-			bs_write_se( s, offset_for_ref_frame[i] );		/* offset_for_ref_frame */
-	}
-#endif
-	bs_write_ue( s, pic_param->num_ref_frames );				/* num_ref_frames */
-	bs_write( s, 1, pic_param->seq_fields.bits.gaps_in_frame_num_value_allowed_flag );
-										/* gaps_in_frame_num_value_allowed_flag */
-	bs_write_ue( s, pic_param->picture_width_in_mbs_minus1 );		/* picture_width_in_mbs_minus1 */
-	if ( pic_param->seq_fields.bits.frame_mbs_only_flag )
-		bs_write_ue( s, pic_param->picture_height_in_mbs_minus1 );	/* picture_height_in_mbs_minus1 */
-	else /* interlaced */
-		bs_write_ue( s, (pic_param->picture_height_in_mbs_minus1 + 1) / 2 - 1 );
-	bs_write( s, 1, pic_param->seq_fields.bits.frame_mbs_only_flag );	/* frame_mbs_only_flag */
-	if ( !pic_param->seq_fields.bits.frame_mbs_only_flag )
-		bs_write( s, 1, pic_param->seq_fields.bits.mb_adaptive_frame_field_flag );
-										/* mb_adaptive_frame_field_flag */
-	bs_write( s, 1, pic_param->seq_fields.bits.direct_8x8_inference_flag );	/* direct_8x8_inference_flag */
-	bs_write( s, 1, 0 );							/* crop? */
-	bs_write( s, 1, 0 );							/* vui? */
-
-	bs_rbsp_trailing( s );
-	bs_flush( s );
-
-	/* PPS header */
-	bs_realign( s );
-
-	bs_write( s, 24, 0x000001 );							/* start_code */
-	bs_write( s, 8, NAL_HIGHEST_PPS );						/* nal */
-
-	bs_write_ue( s, 0x00 );								/* pps_id */
-	bs_write_ue( s, 0x00 );								/* sps_id */
-	bs_write( s, 1, pic_param->pic_fields.bits.entropy_coding_mode_flag );		/* entrophy_coding_mode_flag */
-	bs_write( s, 1, pic_param->pic_fields.bits.pic_order_present_flag );		/* pic_order_present_flag */
-	bs_write_ue( s, pic_param->num_slice_groups_minus1 );				/* num_slice_groups_minus1 */
-	if ( pic_param->num_slice_groups_minus1 > 0 )
-	{
-		bs_write_ue( s, pic_param->slice_group_map_type );			/* slice_group_map_type */
-		switch (pic_param->slice_group_map_type) {
-			/* TODO: 0, 2, 6 */
-#if 0
-		case 0:
-			for (int i = 0; i <= pic_param->num_slice_groups_minus1; i++ )
-			{
-				bs_write_ue( s, run_length_minus1[i] );			/* no run_length_group_minus1[i] */
-			}
-			break;
-		case 2:
-			for (int i = 0; i <= pic_param->num_slice_groups_minus1; i++ )
-			{
-				bs_write_ue( s, top_left[i] );				/* no top_left[i] */
-				bs_write_ue( s, bottom_right[i] );			/* no bottom_right[i] */
-			}
-			break;
-#endif
-		case 3:
-		case 4:
-		case 5:
-			bs_write( s, 1, 0 );						/* no slice_group_change_direction_flag */
-			bs_write_ue( s, pic_param->slice_group_change_rate_minus1 );	/* slice_group_change_rate_minus1 */
-			break;
-#if 0
-		case 6:
-			bs_write_ue( s, pic_size_in_map_units_minus1 );			/* no pic_size_in_map_units_minus1 */
-			for (int i = 0; i <= pic_size_in_map_units_minus1; i++ )
-			{
-				/* write slice list here */
-			}
-			break;
-#endif
-
-		default:
-			vaStatus = VA_STATUS_ERROR_UNKNOWN;
-			goto error;
-		}
-	}
-	bs_write_ue( s, slice_param->num_ref_idx_l0_active_minus1);			/* num_ref_idx_l0_active_minus_1 */
-	bs_write_ue( s, slice_param->num_ref_idx_l1_active_minus1);			/* num_ref_idx_l1_active_minus_1 */
-	bs_write( s, 1, pic_param->pic_fields.bits.weighted_pred_flag);			/* weighted_pred_flag */
-	bs_write( s, 2, pic_param->pic_fields.bits.weighted_bipred_idc);		/* weighted_bipred_idc */
-	bs_write_se( s, pic_param->pic_init_qp_minus26);				/* pic_init_qp_minus26 */
-	bs_write_se( s, pic_param->pic_init_qs_minus26);				/* pic_init_qs_minus26 */
-	bs_write_se( s, pic_param->chroma_qp_index_offset);				/* chroma_qp_index_offset */
-	bs_write( s, 1, pic_param->pic_fields.bits.deblocking_filter_control_present_flag);	/* deblocking_filter_control_present_flag */
-	bs_write( s, 1, pic_param->pic_fields.bits.constrained_intra_pred_flag);	/* constrained_intra_pred_flag */
-	bs_write( s, 1, pic_param->pic_fields.bits.reference_pic_flag);			/* reference_pic_flag */
-#if 0
-	if ( pic_param->pic_fields.bits.transform_8x8_mode_flag )			/* what's cqm? */
-	{
-		/* TODO: scaling_matrix_present_flag, scaling_list,  */
-		bs_write( s, 1, pic_param->pic_fields.bits.transform_8x8_mode_flag );	/* transform_8x8_mode_flag */
-		bs_write( s, 1, scaling_matrix_present_flag );				/* no scaling_matrix_present_flag */
-		if ( cqm )
-		{
-		}
-		bs_write_se( s, pic_param->second_chroma_qp_index_offset );		/* second_chroma_qp_index_offset */
-	}
-#endif
-	bs_rbsp_trailing( s );
-	bs_flush( s );
-
-	obj_surface->metadata = (uint8_t *)malloc(bs.p - bs.p_start);
-	obj_surface->metadata_size = bs.p - bs.p_start;
-	memcpy(obj_surface->metadata, bs.p_start, bs.p - bs.p_start);
-
-	crystalhd_DestroyBuffer(ctx, obj_buffer->base.id);
-	crystalhd_DestroyBuffer(ctx, buffered_picture_parameter_buffer->base.id);
-	buffered_picture_parameter_buffer = NULL;
-
-	INSTRUMENT_RET;
-	return VA_STATUS_SUCCESS;
-
-error:
 	INSTRUMENT_RET;
 	return vaStatus;
 }
@@ -1785,45 +1410,6 @@ VAStatus crystalhd_render_slice_parameter_buffer(
 
 	INSTRUMENT_RET;
 	return vaStatus;
-}
-
-VAStatus crystalhd_render_slice_data_buffer_h264(
-		VADriverContextP ctx,
-		object_context_p obj_context,
-		object_buffer_p obj_buffer
-	)
-{
-	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
-	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
-	int i;
-
-	obj_surface->data = (uint8_t *)malloc((3 + obj_buffer->element_size) * obj_buffer->num_elements + 4);
-	if (NULL == obj_surface->data)
-	{
-		INSTRUMENT_RET;
-		return VA_STATUS_ERROR_ALLOCATION_FAILED;
-	}
-	obj_surface->data_size = (3 + obj_buffer->element_size) * obj_buffer->num_elements + 4;
-
-	for (i = 0; i < obj_buffer->num_elements; ++i)
-	{
-		obj_surface->data[obj_buffer->element_size * i + 0] = 0x00;
-		obj_surface->data[obj_buffer->element_size * i + 1] = 0x00;
-		obj_surface->data[obj_buffer->element_size * i + 2] = 0x01;
-		memcpy(obj_surface->data + (obj_buffer->element_size * i) + 3,
-			obj_buffer->buffer_data, obj_buffer->element_size * obj_buffer->num_elements);
-	}
-
-	obj_surface->data[obj_surface->data_size - 4] = 0x00;
-	obj_surface->data[obj_surface->data_size - 3] = 0x00;
-	obj_surface->data[obj_surface->data_size - 2] = 0x01;
-	obj_surface->data[obj_surface->data_size - 1] = NAL_DISPOSABLE_EOSEQ;
-
-	crystalhd_DestroyBuffer(ctx, obj_buffer->base.id);
-
-	INSTRUMENT_RET;
-	return VA_STATUS_SUCCESS;
 }
 
 VAStatus crystalhd_render_slice_data_buffer(
@@ -2169,21 +1755,37 @@ VAStatus crystalhd_SetDisplayAttributes (
 
 VAStatus crystalhd_BufferInfo(
 		VADriverContextP ctx,
-		VAContextID context,	/* in */
-		VABufferID buf_id,	/* in */
-		VABufferType *type,	/* out */
+		VAContextID context,		/* in */
+		VABufferID buffer_id,		/* in */
+		VABufferType *type,		/* out */
 		unsigned int *size,		/* out */
-		unsigned int *num_elements /* out */
+		unsigned int *num_elements	/* out */
 	)
 {
+	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
-	/* TODO */
+
+	object_buffer_p obj_buffer = BUFFER(buffer_id);
+	if (NULL == obj_buffer)
+	{
+		INSTRUMENT_RET;
+		return VA_STATUS_ERROR_INVALID_BUFFER;
+	}
+
+	if (NULL != type)
+		*type = obj_buffer->type;
+
+	if (NULL != size)
+		*size = obj_buffer->element_size;
+
+	if (NULL != num_elements)
+		*num_elements = obj_buffer->num_elements;
+
 	INSTRUMENT_RET;
-	return VA_STATUS_ERROR_UNIMPLEMENTED;
+	return VA_STATUS_SUCCESS;
 }
 
-	
-
+#if 0
 VAStatus crystalhd_LockSurface(
 		VADriverContextP ctx,
 		VASurfaceID surface,
@@ -2214,8 +1816,12 @@ VAStatus crystalhd_UnlockSurface(
 	INSTRUMENT_RET;
 	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
+#endif
 
-VAStatus crystalhd_Terminate( VADriverContextP ctx )
+VAStatus
+crystalhd_Terminate(
+		VADriverContextP ctx
+	)
 {
 	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
@@ -2225,6 +1831,21 @@ VAStatus crystalhd_Terminate( VADriverContextP ctx )
 	object_config_p obj_config;
 	object_image_p obj_image;
 	object_heap_iterator iter;
+
+	/* close device */
+	if (driver_data->hdev)
+	{
+		DtsDeviceClose(driver_data->hdev);
+	}
+
+	/* Clean up images */
+	obj_image = (object_image_p) object_heap_first( &driver_data->image_heap, &iter);
+	while (obj_image)
+	{
+		object_heap_free( &driver_data->image_heap, (object_base_p) obj_image);
+		obj_image = (object_image_p) object_heap_next( &driver_data->image_heap, &iter);
+	}
+	object_heap_destroy( &driver_data->image_heap );
 
 	/* Clean up left over buffers */
 	obj_buffer = (object_buffer_p) object_heap_first( &driver_data->buffer_heap, &iter);
@@ -2242,7 +1863,7 @@ VAStatus crystalhd_Terminate( VADriverContextP ctx )
 	/* TODO cleanup */
 	object_heap_destroy( &driver_data->context_heap );
 
-	/* Clean up configIDs */
+	/* Clean up configs */
 	obj_config = (object_config_p) object_heap_first( &driver_data->config_heap, &iter);
 	while (obj_config)
 	{
@@ -2251,29 +1872,16 @@ VAStatus crystalhd_Terminate( VADriverContextP ctx )
 	}
 	object_heap_destroy( &driver_data->config_heap );
 
-	/* TODO cleanup */
-	obj_image = (object_image_p) object_heap_first( &driver_data->image_heap, &iter);
-	while (obj_image)
-	{
-		object_heap_free( &driver_data->image_heap, (object_base_p) obj_image);
-		obj_image = (object_image_p) object_heap_next( &driver_data->image_heap, &iter);
-	}
-	object_heap_destroy( &driver_data->image_heap );
-
-	if (driver_data->hdev)
-	{
-		DtsDeviceClose(driver_data->hdev);
-		driver_data->hdev = NULL;
-	}
-
 	free(ctx->pDriverData);
-	ctx->pDriverData = NULL;
 
 	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
-VAStatus __vaDriverInit_0_31(  VADriverContextP ctx )
+VAStatus
+__vaDriverInit_0_31(
+		VADriverContextP ctx
+	)
 {
 	INSTRUMENT_CALL;
 	object_base_p obj;

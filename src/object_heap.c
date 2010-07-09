@@ -22,12 +22,16 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "object_heap.h"
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
 
-#include "assert.h"
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#include "object_heap.h"
 
 #define ASSERT	assert
 

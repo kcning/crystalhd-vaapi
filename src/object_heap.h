@@ -26,7 +26,7 @@
 #define _OBJECT_HEAP_H_
 
 #define OBJECT_HEAP_OFFSET_MASK		0x7F000000
-#define OBJECT_HEAP_ID_MASK			0x00FFFFFF
+#define OBJECT_HEAP_ID_MASK		0x00FFFFFF
 
 typedef struct object_base *object_base_p;
 typedef struct object_heap *object_heap_p;
