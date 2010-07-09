@@ -1,4 +1,4 @@
-DRIVERS  = crystalhd
+DRIVERS  =
 
 INCLUDES = \
 	$(CRYSTALHD_VIDEO_CFLAGS)
@@ -15,16 +15,19 @@ endif
 source_x11_h = crystalhd_video_x11.h
 source_x11_c = crystalhd_video_x11.c
 
-source_h = \
-	object_heap.h	\
-	crystalhd_video.h \
-	$(source_glx_h)	\
+source_h =			\
+	bitstream.h		\
+	h264.h			\
+	object_heap.h		\
+	osdep.h			\
+	crystalhd_video.h	\
+	$(source_glx_h)		\
 	$(source_x11_h)
 
-source_c = \
-	object_heap.c	\
+source_c =			\
+	object_heap.c		\
 	crystalhd_video.c	\
-	$(source_glx_c)	\
+	$(source_glx_c)		\
 	$(source_x11_c)
 
 crystalhd_drv_video_la_LTLIBRARIES	= crystalhd_drv_video.la

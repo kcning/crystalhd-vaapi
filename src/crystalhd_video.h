@@ -30,11 +30,14 @@
 #include <va/va.h>
 #include <va/va_backend.h>
 
+#include <libcrystalhd/bc_dts_types.h>
 #include <libcrystalhd/bc_dts_defs.h>
 #include <libcrystalhd/libcrystalhd_if.h>
 #include <libcrystalhd/libcrystalhd_version.h>
 
 #include "object_heap.h"
+
+#define DTS_OUTPUT_TIMEOUT			1000
 
 #define CRYSTALHD_MAX_PROFILES			11
 #define CRYSTALHD_MAX_ENTRYPOINTS		5
@@ -43,6 +46,10 @@
 #define CRYSTALHD_MAX_SUBPIC_FORMATS		4
 #define CRYSTALHD_MAX_DISPLAY_ATTRIBUTES	4
 #define CRYSTALHD_STR_VENDOR			"Broadcom Crystal HD Video Decoder " RC_PRODUCT_VERSION
+
+#define ALIGN(i, n)		(((i) + (n) - 1) & ~((n) - 1))
+#define STRIDE(w)		(((w) + 0xf) & ~0xf)
+#define SIZE_YUV420(w, h)	((h) * (STRIDE(w) + STRIDE((w) >> 1)))
 
 struct crystalhd_driver_data
 {
@@ -78,18 +85,26 @@ struct object_context {
 struct object_surface {
 	struct object_base base;
 	VASurfaceID surface_id;
+	uint8_t *metadata;
+	int metadata_size;
+	uint8_t *data;
+	int data_size;
+	VAImageID output_image_id;
 };
 
 struct object_buffer {
 	struct object_base base;
+	VABufferType type;
 	void *buffer_data;
-	int max_num_elements;
+	int element_size;
 	int num_elements;
+	int max_num_elements;
 };
 
 struct object_image {
 	struct object_base base;
 	VAImage image;
+	unsigned int *palette;
 };
 
 typedef struct object_config *object_config_p;
