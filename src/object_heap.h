@@ -32,17 +32,17 @@ typedef struct object_base *object_base_p;
 typedef struct object_heap *object_heap_p;
 
 struct object_base {
-    int id;
-    int next_free;
+	int id;
+	int next_free;
 };
 
 struct object_heap {
-    int	object_size;
-    int id_offset;
-    void *heap_index;
-    int next_free;
-    int heap_size;
-    int heap_increment;
+	int	object_size;
+	int id_offset;
+	void *heap_index;
+	int next_free;
+	int heap_size;
+	int heap_increment;
 };
 
 typedef int object_heap_iterator;
