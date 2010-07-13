@@ -24,14 +24,14 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_CONFIG
+#ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
 
 #include "debug.h"
 
 #ifdef USE_DEBUG
-inline void
+void
 crystalhd__print_buffer(uint8_t *data, uint32_t size)
 {
 	unsigned int i = 0;
@@ -41,7 +41,7 @@ crystalhd__print_buffer(uint8_t *data, uint32_t size)
 	printf("\n=====\n");
 }
 
-inline void
+void
 crystalhd__error_message(const char *msg, ...)
 {
 	va_list args;
@@ -52,7 +52,7 @@ crystalhd__error_message(const char *msg, ...)
 	va_end(args);
 }
 
-inline void
+void
 crystalhd__information_message(const char *msg, ...)
 {
 	va_list args;

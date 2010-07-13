@@ -47,8 +47,6 @@ typedef struct {
 	int frame_only;		/* forbid interlacing */
 } h264_level_t;
 
-extern const h264_level_t h264_levels[];
-
 enum h264_profile_e
 {
 	H264_PROFILE_BASELINE		= 66,

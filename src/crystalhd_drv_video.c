@@ -24,7 +24,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_CONFIG
+#ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
 
@@ -33,6 +33,10 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+
+#define _GNU_SOURCE
+#define __USE_GNU
+#include <dlfcn.h>
 
 #include "crystalhd_drv_video.h"
 #include "crystalhd_video_h264.h"
@@ -44,6 +48,9 @@
 #define SURFACE_ID_OFFSET		0x04000000
 #define BUFFER_ID_OFFSET		0x08000000
 #define IMAGE_ID_OFFSET			0x10000000
+
+object_buffer_p buffered_picture_parameter_buffer;
+object_buffer_p buffered_slice_parameter_buffer;
 
 enum {
 	CRYSTALHD_SURFACETYPE_RGBA = 1,
@@ -685,14 +692,19 @@ VAStatus crystalhd_GetImage(
 		return VA_STATUS_ERROR_INVALID_SURFACE;
 	}
 
+	object_image_p obj_output_image = IMAGE(obj_surface->output_image_id);
+	if (NULL == obj_output_image)
+	{
+		INSTRUMENT_RET;
+		return VA_STATUS_ERROR_INVALID_IMAGE;
+	}
+
 	object_image_p obj_image = IMAGE(image);
 	if (NULL == obj_image)
 	{
 		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_INVALID_IMAGE;
 	}
-
-	object_image_p obj_output_image = IMAGE(obj_surface->output_image_id);
 
 	obj_image->image.format = obj_output_image->image.format;
 	obj_image->image.width = obj_output_image->image.width;
@@ -710,10 +722,16 @@ VAStatus crystalhd_GetImage(
 	obj_image->image.component_order[2] = obj_output_image->image.component_order[2];
 	obj_image->image.component_order[3] = obj_output_image->image.component_order[3];
 
-	memcpy(	BUFFER(obj_image->image.buf)->buffer_data,
-		BUFFER(obj_output_image->image.buf)->buffer_data,
+	object_buffer_p buf = BUFFER(obj_image->image.buf),
+			obuf = BUFFER(obj_output_image->image.buf);
+	crystalhd__information_message("0x%08x\n", obj_image->image.buf);
+	crystalhd__information_message("0x%08x\n", obj_output_image->image.buf);
+	
+	INSTRUMENT_CHECKPOINT(1);
+	memcpy(	buf->buffer_data, obuf->buffer_data,
 		CRYSTALHD_MIN(obj_image->image.data_size, obj_output_image->image.data_size));
-	obj_image->image.data_size = CRYSTALHD_MIN(obj_image->image.data_size, obj_output_image->image.data_size);
+	crystalhd__information_message("0x%08x 0x%08x\n", obj_image->image.data_size, obj_output_image->image.data_size);
+	INSTRUMENT_CHECKPOINT(2);
 	
 	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
@@ -1172,8 +1190,6 @@ VAStatus crystalhd_MapBuffer(
 	{
 		*pbuf = obj_buffer->buffer_data;
 	}
-	//crystalhd__information_message("%s: id: 0x%08d, data: 0x%08d, pbuf: 0x%08d, *pbuf: 0x%08d", __func__,
-	//		buffer_id, obj_buffer->buffer_data, pbuf, *pbuf);
 
 	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
@@ -1206,6 +1222,18 @@ VAStatus crystalhd_DestroyBuffer(
 {
 	INIT_DRIVER_DATA;
 	object_buffer_p obj_buffer = BUFFER(buffer_id);
+
+	Dl_info dlinfo;
+	void * caller = __builtin_return_address(0);
+	dladdr(caller, &dlinfo);
+
+	crystalhd__information_message("%s (#%d): buffer 0x%08x being destroyed, called by %s.\n", __func__, __LINE__, buffer_id, dlinfo.dli_sname);
+
+	if (dlinfo.dli_sname != NULL && strcmp("ff_vaapi_common_end_frame", dlinfo.dli_sname) == 0)
+	{
+		crystalhd__information_message("%s (#%d): WORKAROUND: buffer not deleted when being called by 'ff_vaapi_common_end_frame()'\n", __func__, __LINE__);
+		return VA_STATUS_SUCCESS;
+	}
 
 	if (obj_buffer)
 		crystalhd__destroy_buffer(driver_data, obj_buffer);
@@ -1493,10 +1521,6 @@ VAStatus crystalhd_RenderPicture(
 		object_buffer_p obj_buffer = BUFFER(buffers[i]);
 		switch (obj_buffer->type)
 		{
-		case VAIQMatrixBufferType:
-			vaStatus = VA_STATUS_SUCCESS;
-			break;
-
 		case VAPictureParameterBufferType:
 			vaStatus = crystalhd_render_picture_parameter_buffer(ctx, obj_context, obj_buffer);
 			break;
@@ -1510,7 +1534,7 @@ VAStatus crystalhd_RenderPicture(
 			break;
 
 		default:
-			crystalhd__information_message("%s: byffer type '%d' not handled.", __func__, obj_buffer->type);
+			crystalhd__information_message("%s: byffer type '%d' not handled.\n", __func__, obj_buffer->type);
 		}
 	}
 
@@ -1532,6 +1556,8 @@ VAStatus crystalhd_EndPicture(
 	BC_STATUS sts;
 	object_context_p obj_context;
 	object_surface_p obj_surface;
+
+	image.image_id = VA_INVALID_ID;
 
 	obj_context = CONTEXT(context);
 	assert(obj_context);
@@ -1566,8 +1592,6 @@ VAStatus crystalhd_EndPicture(
 		return VA_STATUS_ERROR_OPERATION_FAILED;
 	}
 
-	VABufferID obj_image_buf_id = -1;
-
 	width = obj_context->picture_width;
 	height = obj_context->picture_height;
 again:
@@ -1576,8 +1600,7 @@ again:
 
 	if (image.image_id != VA_INVALID_ID)
 		vaStatus = crystalhd_DestroyImage(ctx, image.image_id);
-	vaStatus = crystalhd_CreateImage(ctx, &(crystalhd_image_formats_map[0].va_format),
-			width, height, &image);
+	vaStatus = crystalhd_CreateImage(ctx, &(crystalhd_image_formats_map[0].va_format), width, height, &image);
 	if (vaStatus != VA_STATUS_SUCCESS)
 	{
 		INSTRUMENT_RET;
@@ -1599,8 +1622,10 @@ again:
 	switch (sts) {
 	case BC_STS_SUCCESS:
 		if (!(output.PoutFlags & BC_POUT_FLAGS_PIB_VALID))
+		{
+			crystalhd__information_message("%s: checking BC_POUT_FLAG_PIB_VALID failed. trying again.\n", __func__);
 			goto again;
-		obj_surface->output_image_id = image.image_id;
+		}
 		break;
 
 	case BC_STS_FMT_CHANGE:
@@ -1608,18 +1633,18 @@ again:
 		if ((output.PoutFlags & flags) == flags) {
 			width = output.PicInfo.width;
 			height = output.PicInfo.height;
-			goto again;
 		}
+		goto again;
 
 	default:
 		if (sts != BC_STS_SUCCESS)
 		{
-			crystalhd_DestroyBuffer(ctx, image.image_id);
 			crystalhd__information_message("status = %d\n", sts);
 			INSTRUMENT_RET;
 			return VA_STATUS_ERROR_OPERATION_FAILED;
 		}
 	}
+	obj_surface->output_image_id = image.image_id;
 
 	// For now, assume that we are done with rendering right away
 	obj_context->current_render_target = -1;
@@ -1627,7 +1652,6 @@ again:
 	INSTRUMENT_RET;
 	return vaStatus;
 }
-
 
 VAStatus crystalhd_SyncSurface(
 		VADriverContextP ctx,
@@ -1637,10 +1661,9 @@ VAStatus crystalhd_SyncSurface(
 	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
-	object_surface_p obj_surface;
+	//object_surface_p obj_surface;
 
-	obj_surface = SURFACE(render_target);
-	assert(obj_surface);
+	//obj_surface = SURFACE(render_target);
 
 	INSTRUMENT_RET;
 	return vaStatus;
@@ -1952,7 +1975,12 @@ __vaDriverInit_0_31(
 	sts = DtsDeviceOpen(&(driver_data->hdev),
 			DTS_PLAYBACK_MODE | DTS_LOAD_FILE_PLAY_FW |
 			DTS_DFLT_RESOLUTION(vdecRESOLUTION_CUSTOM));
-	assert( sts == BC_STS_SUCCESS );
+	if ( sts != BC_STS_SUCCESS )
+	{
+		DtsDeviceClose(driver_data->hdev);
+		INSTRUMENT_RET;
+		return VA_STATUS_ERROR_OPERATION_FAILED;
+	}
 
 	result = object_heap_init( &driver_data->config_heap, sizeof(struct object_config), CONFIG_ID_OFFSET );
 	assert( result == 0 );
@@ -1972,4 +2000,3 @@ __vaDriverInit_0_31(
 	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
-

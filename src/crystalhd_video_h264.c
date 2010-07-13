@@ -24,7 +24,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_CONFIG
+#ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
 
@@ -35,7 +35,7 @@
 #include "debug.h"
 #include "crystalhd_video_h264.h"
 
-const h264_level_t h264_levels[] =
+static const h264_level_t h264_levels[] =
 {
 	{ 10,   1485,    99,   152064,     64,    175,  64, 64,  0, 2, 0, 0, 1 },
 	{ 11,   3000,   396,   345600,    192,    500, 128, 64,  0, 2, 0, 0, 1 },
@@ -96,8 +96,8 @@ static inline int h264_validate_levels(
 
 static inline int h264_get_level_idc(
 		int profile_idc,
-		VAPictureParameterBufferH264 * const pic_param,
-		VASliceParameterBufferH264 * const slice_param
+		VAPictureParameterBufferH264 * pic_param,
+		VASliceParameterBufferH264 * slice_param
 	)
 {
 	const h264_level_t *l = h264_levels;
@@ -119,8 +119,12 @@ VAStatus crystalhd_render_picture_parameter_buffer_h264(
 {
 	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
-	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
+
+	if (buffered_picture_parameter_buffer)
+		crystalhd_DestroyBuffer(ctx, buffered_picture_parameter_buffer->base.id);
+
 	buffered_picture_parameter_buffer = obj_buffer;
+
 	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
@@ -133,15 +137,39 @@ VAStatus crystalhd_render_slice_parameter_buffer_h264(
 {
 	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
-	VAStatus vaStatus = VA_STATUS_SUCCESS;
-	uint8_t data[3000] = { 0x00 };
+
+	if (buffered_slice_parameter_buffer)
+		crystalhd_DestroyBuffer(ctx, buffered_slice_parameter_buffer->base.id);
+
+	buffered_slice_parameter_buffer = obj_buffer;
+
+	INSTRUMENT_RET;
+	return VA_STATUS_SUCCESS;
+}
+
+static inline
+VAStatus crystalhd_render_sps_pps_h264(
+		VADriverContextP ctx,
+		object_context_p obj_context
+	)
+{
+	INIT_DRIVER_DATA;
+	INSTRUMENT_CALL;
+
+	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
+	uint8_t metadata[2000] = { 0x00 };
 	bs_t bs;
 	bs_t *s = &bs;
 	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
-	VAPictureParameterBufferH264 * const pic_param = ((object_buffer_p)buffered_picture_parameter_buffer)->buffer_data;
-	VASliceParameterBufferH264 * const slice_param = obj_buffer->buffer_data;
+	VAPictureParameterBufferH264 * const pic_param = buffered_picture_parameter_buffer->buffer_data;
+	VASliceParameterBufferH264 * const slice_param = buffered_slice_parameter_buffer->buffer_data;
+	if (!pic_param || !slice_param)
+	{
+		INSTRUMENT_RET;
+		return VA_STATUS_ERROR_OPERATION_FAILED;
+	}
 
-	bs_init( s, data, sizeof(data) / sizeof(*data) );
+	bs_init( s, metadata, sizeof(metadata) / sizeof(*metadata) );
 
 	/* SPS header */
 	bs_realign( s );
@@ -303,12 +331,7 @@ VAStatus crystalhd_render_slice_parameter_buffer_h264(
 	obj_surface->metadata_size = bs.p - bs.p_start;
 	memcpy(obj_surface->metadata, bs.p_start, bs.p - bs.p_start);
 
-	crystalhd_DestroyBuffer(ctx, obj_buffer->base.id);
-	crystalhd_DestroyBuffer(ctx, buffered_picture_parameter_buffer->base.id);
-	buffered_picture_parameter_buffer = NULL;
-
-	INSTRUMENT_RET;
-	return VA_STATUS_SUCCESS;
+	vaStatus = VA_STATUS_SUCCESS;
 
 error:
 	INSTRUMENT_RET;
@@ -323,6 +346,9 @@ VAStatus crystalhd_render_slice_data_buffer_h264(
 {
 	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
+
+	crystalhd_render_sps_pps_h264(ctx, obj_context);
+
 	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
 	int i;
 

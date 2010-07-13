@@ -4,7 +4,7 @@ INCLUDES = \
 	$(CRYSTALHD_VIDEO_CFLAGS)
 
 LDADD = \
-	$(CRYSTALHD_VIDEO_LT_LDFLAGS) -module \
+	$(CRYSTALHD_VIDEO_LT_LDFLAGS) -ldl -module \
 	-no-undefined -module -Wl,--no-undefined
 
 if USE_GLX

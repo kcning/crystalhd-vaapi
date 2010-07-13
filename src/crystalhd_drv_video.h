@@ -137,6 +137,7 @@ crystalhd_driver_data(VADriverContextP ctx)
 }
 
 /* FIXME: dirty hack of global variable */
-object_buffer_p buffered_picture_parameter_buffer;
+extern object_buffer_p buffered_picture_parameter_buffer;
+extern object_buffer_p buffered_slice_parameter_buffer;
 
 #endif
