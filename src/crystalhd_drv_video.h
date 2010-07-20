@@ -97,6 +97,13 @@ struct object_context {
 	int num_render_targets;
 	int flags;
 	VASurfaceID *render_targets;
+
+	VABufferID last_iqmatrix_buffer_id;
+	VABufferID last_slice_param_buffer_id;
+	VABufferID last_picture_param_buffer_id;
+
+	int last_h264_sps_id;
+	int last_h264_pps_id;
 };
 
 struct object_surface {
@@ -135,9 +142,5 @@ crystalhd_driver_data(VADriverContextP ctx)
 {
 	return (struct crystalhd_driver_data *)ctx->pDriverData;
 }
-
-/* FIXME: dirty hack of global variable */
-extern object_buffer_p buffered_picture_parameter_buffer;
-extern object_buffer_p buffered_slice_parameter_buffer;
 
 #endif

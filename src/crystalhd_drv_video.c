@@ -954,12 +954,17 @@ VAStatus crystalhd_CreateContext(
 	obj_context->picture_width = picture_width;
 	obj_context->picture_height = picture_height;
 	obj_context->num_render_targets = num_render_targets;
+	obj_context->last_iqmatrix_buffer_id = 0;
+	obj_context->last_slice_param_buffer_id = 0;
+	obj_context->last_picture_param_buffer_id = 0;
+	obj_context->last_h264_sps_id = 0;
+	obj_context->last_h264_pps_id = 0;
+
 	obj_context->render_targets = (VASurfaceID *) malloc(num_render_targets * sizeof(VASurfaceID));
 	if (obj_context->render_targets == NULL)
 	{
-		vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
 		INSTRUMENT_RET;
-		return vaStatus;
+		return VA_STATUS_ERROR_ALLOCATION_FAILED;
 	}
 	
 	for(i = 0; i < num_render_targets; i++)
@@ -1207,10 +1212,7 @@ VAStatus crystalhd_UnmapBuffer(
 static void crystalhd__destroy_buffer(struct crystalhd_driver_data *driver_data, object_buffer_p obj_buffer)
 {
 	if (NULL != obj_buffer->buffer_data)
-	{
 		free(obj_buffer->buffer_data);
-		obj_buffer->buffer_data = NULL;
-	}
 
 	object_heap_free( &driver_data->buffer_heap, (object_base_p) obj_buffer);
 }
@@ -1222,21 +1224,21 @@ VAStatus crystalhd_DestroyBuffer(
 {
 	INIT_DRIVER_DATA;
 	object_buffer_p obj_buffer = BUFFER(buffer_id);
+	if (NULL == obj_buffer)
+		return VA_STATUS_SUCCESS;
 
 	Dl_info dlinfo;
 	void * caller = __builtin_return_address(0);
 	dladdr(caller, &dlinfo);
 
-	crystalhd__information_message("%s (#%d): buffer 0x%08x being destroyed, called by %s.\n", __func__, __LINE__, buffer_id, dlinfo.dli_sname);
-
 	if (dlinfo.dli_sname != NULL && strcmp("ff_vaapi_common_end_frame", dlinfo.dli_sname) == 0)
 	{
-		crystalhd__information_message("%s (#%d): WORKAROUND: buffer not deleted when being called by 'ff_vaapi_common_end_frame()'\n", __func__, __LINE__);
-		return VA_STATUS_SUCCESS;
+		// do not destroy image buffer
+		if (obj_buffer->type == VAImageBufferType)
+			return VA_STATUS_SUCCESS;
 	}
 
-	if (obj_buffer)
-		crystalhd__destroy_buffer(driver_data, obj_buffer);
+	crystalhd__destroy_buffer(driver_data, obj_buffer);
 
 	return VA_STATUS_SUCCESS;
 }
@@ -1251,12 +1253,42 @@ VAStatus crystalhd_BeginPicture(
 	INSTRUMENT_CALL;
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_context_p obj_context = CONTEXT(context);
-	object_surface_p obj_surface = SURFACE(render_target);
-
 	assert(obj_context);
+	object_surface_p obj_surface = SURFACE(render_target);
 	assert(obj_surface);
+	object_config_p obj_config = CONFIG(obj_context->config_id);
+	assert(obj_config);
 
 	obj_context->current_render_target = obj_surface->base.id;
+
+	switch (obj_config->profile) {
+		case VAProfileH264Baseline:
+		case VAProfileH264Main:
+		case VAProfileH264High:
+			vaStatus = crystalhd_begin_picture_h264(ctx, context, render_target);
+			break;
+#if 0
+		case VAProfileMPEG2Simple:
+		case VAProfileMPEG2Main:
+			vaStatus = crystalhd_begin_picture_mpeg2(ctx, context, render_target);
+			break;
+
+		case VAProfileVC1Simple:
+			vaStatus = crystalhd_begin_picture_vc1(ctx, context, render_target);
+			break;
+
+		case VAProfileDivx???:
+			vaStatus = crystalhd_begin_picture_divx(ctx, context, render_target);
+			break;
+
+		case VAProfileVC1Main:
+		case VAProfileVC1Advanced:
+			vaStatus = crystalhd_begin_picture_vc1mp(ctx, context, render_target);
+			break;
+#endif
+		default:
+			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
+	}
 
 	INSTRUMENT_RET;
 	return vaStatus;
@@ -1305,6 +1337,50 @@ VAStatus crystalhd_render_picture_parameter_buffer_vc1mp(
 	return vaStatus;
 }
 #endif
+
+VAStatus crystalhd_render_iqmatrix_buffer(
+		VADriverContextP ctx,
+		object_context_p obj_context,
+		object_buffer_p obj_buffer
+	)
+{
+	INIT_DRIVER_DATA;
+	INSTRUMENT_CALL;
+	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
+	object_config_p obj_config = CONFIG(obj_context->config_id);
+
+	switch (obj_config->profile) {
+		case VAProfileH264Baseline:
+		case VAProfileH264Main:
+		case VAProfileH264High:
+			vaStatus = crystalhd_render_iqmatrix_buffer_h264(ctx, obj_context, obj_buffer);
+			break;
+#if 0
+		case VAProfileMPEG2Simple:
+		case VAProfileMPEG2Main:
+			vaStatus = crystalhd_render_iqmatrix_buffer_mpeg2(ctx, obj_context, obj_buffer);
+			break;
+
+		case VAProfileVC1Simple:
+			vaStatus = crystalhd_render_iqmatrix_buffer_vc1(ctx, obj_context, obj_buffer);
+			break;
+
+		case VAProfileDivx???:
+			vaStatus = crystalhd_render_iqmatrix_buffer_divx(ctx, obj_context, obj_buffer);
+			break;
+
+		case VAProfileVC1Main:
+		case VAProfileVC1Advanced:
+			vaStatus = crystalhd_render_iqmatrix_buffer_vc1mp(ctx, obj_context, obj_buffer);
+			break;
+#endif
+		default:
+			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
+	}
+
+	INSTRUMENT_RET;
+	return vaStatus;
+}
 
 VAStatus crystalhd_render_picture_parameter_buffer(
 		VADriverContextP ctx,
@@ -1496,11 +1572,12 @@ VAStatus crystalhd_RenderPicture(
 	INIT_DRIVER_DATA;
 	INSTRUMENT_CALL;
 	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
-	object_context_p obj_context = CONTEXT(context);
-	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
 	int i;
 
+	object_context_p obj_context = CONTEXT(context);
 	assert(obj_context);
+
+	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
 	assert(obj_surface);
 
 	/* verify that we got valid buffer references */
@@ -1511,6 +1588,7 @@ VAStatus crystalhd_RenderPicture(
 		assert(obj_buffer);
 		if (NULL == obj_buffer)
 		{
+			INSTRUMENT_RET;
 			return VA_STATUS_ERROR_INVALID_BUFFER;
 		}
 		crystalhd__information_message("%s: buffer[%d] = 0x%08x, type = %d\n", __func__, i, obj_buffer, obj_buffer->type);
@@ -1521,6 +1599,10 @@ VAStatus crystalhd_RenderPicture(
 		object_buffer_p obj_buffer = BUFFER(buffers[i]);
 		switch (obj_buffer->type)
 		{
+		case VAIQMatrixBufferType:
+			vaStatus = crystalhd_render_iqmatrix_buffer(ctx, obj_context, obj_buffer);
+			break;
+
 		case VAPictureParameterBufferType:
 			vaStatus = crystalhd_render_picture_parameter_buffer(ctx, obj_context, obj_buffer);
 			break;
@@ -1554,42 +1636,47 @@ VAStatus crystalhd_EndPicture(
 	VAImage image;
 	BC_DTS_PROC_OUT output;
 	BC_STATUS sts;
-	object_context_p obj_context;
-	object_surface_p obj_surface;
 
 	image.image_id = VA_INVALID_ID;
 
-	obj_context = CONTEXT(context);
+	object_context_p obj_context = CONTEXT(context);
 	assert(obj_context);
 
-	obj_surface = SURFACE(obj_context->current_render_target);
+	object_config_p obj_config = CONFIG(obj_context->config_id);
+	assert(obj_config);
+
+	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
 	assert(obj_surface);
 
-	sts = DtsProcInput(driver_data->hdev, obj_surface->metadata, obj_surface->metadata_size, 0, FALSE);
-	if (sts != BC_STS_SUCCESS)
-	{
-		crystalhd__error_message("%s: Unable to send metadata. status = %d\n", __func__, sts);
-		INSTRUMENT_RET;
-		return VA_STATUS_ERROR_OPERATION_FAILED;
-	}
-	DUMP_BUFFER(obj_surface->metadata, obj_surface->metadata_size, "crystalhd-video_metadata_0x%08x", obj_surface->metadata);
+	switch (obj_config->profile) {
+		case VAProfileH264Baseline:
+		case VAProfileH264Main:
+		case VAProfileH264High:
+			vaStatus = crystalhd_end_picture_h264(ctx, obj_context, obj_surface);
+			break;
 
-	sts = DtsProcInput(driver_data->hdev, obj_surface->data, obj_surface->data_size, 0, FALSE);
-	if (sts != BC_STS_SUCCESS)
-	{
-		crystalhd__error_message("%s: Unable to send data. status = %d\n", __func__, sts);
-		INSTRUMENT_RET;
-		return VA_STATUS_ERROR_OPERATION_FAILED;
-	}
-	DUMP_BUFFER(obj_surface->data, obj_surface->data_size, "crystalhd-video_data_0x%08x", obj_surface->data);
+#if 0
+		case VAProfileMPEG2Simple:
+		case VAProfileMPEG2Main:
+			vaStatus = crystalhd_end_picture_mpeg2(ctx, obj_context, obj_surface);
+			break;
 
-	/* flush the input */
-	sts = DtsFlushInput(driver_data->hdev, 0);
-	if (sts != BC_STS_SUCCESS)
-	{
-		crystalhd__error_message("%s: DtsFlushInput failed with status = %d\n", __func__, sts);
-		INSTRUMENT_RET;
-		return VA_STATUS_ERROR_OPERATION_FAILED;
+		case VAProfileVC1Simple:
+			vaStatus = crystalhd_end_picture_vc1(ctx, obj_context, obj_surface);
+			break;
+
+		case VAProfileDivx???:
+			vaStatus = crystalhd_end_picture_divx(ctx, obj_context, obj_surface);
+			break;
+
+		case VAProfileVC1Main:
+		case VAProfileVC1Advanced:
+			vaStatus = crystalhd_end_picture_vc1mp(ctx, obj_context, obj_surface);
+			break;
+#endif
+
+		default:
+			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 
 	width = obj_context->picture_width;
@@ -1648,6 +1735,10 @@ again:
 
 	// For now, assume that we are done with rendering right away
 	obj_context->current_render_target = -1;
+
+	static int xxx = 0;
+
+	crystalhd__information_message("%s (#%d): I'm being called %d times.", __func__, __LINE__, ++xxx);
 
 	INSTRUMENT_RET;
 	return vaStatus;

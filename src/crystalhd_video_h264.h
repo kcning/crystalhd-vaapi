@@ -61,11 +61,40 @@ enum h264_profile_e
 
 enum NALU
 {
-	NAL_DISPOSABLE_EOSEQ	= 0x0a,
-	NAL_HIGHEST_SLICE_IDR	= 0x65,
-	NAL_HIGHEST_SPS		= 0x67,
-	NAL_HIGHEST_PPS		= 0x68,
+	NALU_PRIO_DISPOSABLE	= 0x00,
+	NALU_PRIO_NORMAL	= 0x20,
+	NALU_PRIO_HIGH		= 0x40,
+	NALU_PRIO_HIGHEST	= 0x60,
+
+	NALU_TYPE_UNSPECIFIED	= 0x00,
+	NALU_TYPE_PICTURE	= 0x01,
+	NALU_TYPE_SLICE_A	= 0x02,
+	NALU_TYPE_SLICE_B	= 0x03,
+	NALU_TYPE_SLICE_C	= 0x04,
+	NALU_TYPE_SLICE_IDR	= 0x05,
+	NALU_TYPE_SEI		= 0x06,
+	NALU_TYPE_SPS		= 0x07,
+	NALU_TYPE_PPS		= 0x08,
+	NALU_TYPE_AUD		= 0x09,
+	NALU_TYPE_EOSEQ		= 0x0a,
+	NALU_TYPE_EOS		= 0x0b,
+	NALU_TYPE_FILL		= 0x0c,
+	NALU_TYPE_SPSEXT	= 0x0d,
+	NALU_TYPE_PREFIX	= 0x0e,
+	NALU_TYPE_SUBSPS	= 0x0f,
+	NALU_TYPE_AUXPICTURE	= 0x13,
+	NALU_TYPE_CSEXT		= 0x14,
+
+	NALU_PRIORITY_MASK	= 0x60,
+	NALU_UNITTYPE_MASK	= 0x1f,
 };
+
+VAStatus
+crystalhd_render_iqmatrix_buffer_h264(
+	VADriverContextP ctx,
+	object_context_p obj_context,
+	object_buffer_p obj_buffer
+);
 
 VAStatus
 crystalhd_render_picture_parameter_buffer_h264(
@@ -86,6 +115,13 @@ crystalhd_render_slice_data_buffer_h264(
 	VADriverContextP ctx,
 	object_context_p obj_context,
 	object_buffer_p obj_buffer
+);
+
+VAStatus
+crystalhd_end_picture_h264(
+	VADriverContextP ctx,
+	object_context_p obj_context,
+	object_surface_p obj_surface
 );
 
 #endif
