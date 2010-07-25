@@ -52,6 +52,10 @@ crystalhd__information_message(const char *msg, ...);
 		fclose(dump_buf); \
 	} while (0);
 
+#define INSTRUMENT_CALL			crystalhd__information_message("%s (#%d): being called\n", __func__, __LINE__);
+#define INSTRUMENT_RET			crystalhd__information_message("%s (#%d): returned\n", __func__, __LINE__);
+#define INSTRUMENT_CHECKPOINT(n)	crystalhd__information_message("%s (#%d): checkpoint %d\n", __func__, __LINE__, n);
+
 #else
 
 #define crystalhd__print_buffer(data,size)
@@ -59,10 +63,10 @@ crystalhd__information_message(const char *msg, ...);
 #define crystalhd__information_message(msg, ...)
 #define DUMP_BUFFER(BUF, SIZE, FILENAME, ...)
 
-#endif
+#define INSTRUMENT_CALL
+#define INSTRUMENT_RET
+#define INSTRUMENT_CHECKPOINT(n)
 
-#define INSTRUMENT_CALL			crystalhd__information_message("%s (#%d): being called\n", __func__, __LINE__);
-#define INSTRUMENT_RET			crystalhd__information_message("%s (#%d): returned\n", __func__, __LINE__);
-#define INSTRUMENT_CHECKPOINT(n)	crystalhd__information_message("%s (#%d): checkpoint %d\n", __func__, __LINE__, n);
+#endif
 
 #endif
