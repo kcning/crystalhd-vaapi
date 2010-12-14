@@ -1081,7 +1081,7 @@ VAStatus crystalhd_CreateBuffer(
 
 	bufferID = object_heap_allocate( &driver_data->buffer_heap );
 	obj_buffer = BUFFER(bufferID);
-	crystalhd__information_message("buffer_id = %d (0x%08x), obj_buffer = 0x%08x, obj_buffer->base.id = 0x%08x, BufferType: %d, size: %d * %d = %d\n",
+	crystalhd__information_message("buffer_id = %d (0x%08x), obj_buffer = %p, obj_buffer->base.id = 0x%08x, BufferType: %d, size: %d * %d = %d\n",
 			bufferID, bufferID, obj_buffer, obj_buffer->base.id, type, size, num_elements, size * num_elements);
 	if (NULL == obj_buffer)
 	{
@@ -1534,7 +1534,7 @@ VAStatus crystalhd_RenderPicture(
 		{
 			return VA_STATUS_ERROR_INVALID_BUFFER;
 		}
-		crystalhd__information_message("%s: buffer[%d] = 0x%08x, type = %d\n", __func__, i, obj_buffer, obj_buffer->type);
+		crystalhd__information_message("%s: buffer[%d] = %p, type = %d\n", __func__, i, obj_buffer, obj_buffer->type);
 	}
 
 	for(i = 0;i < num_buffers; ++i)
@@ -1629,7 +1629,7 @@ again:
 
 	if (image.image_id != VA_INVALID_ID)
 		vaStatus = crystalhd_DestroyImage(ctx, image.image_id);
-	vaStatus = crystalhd_CreateImage(ctx, &(crystalhd_image_formats_map[0].va_format), width, height, &image);
+	vaStatus = crystalhd_CreateImage(ctx, (VAImageFormat *) &(crystalhd_image_formats_map[0].va_format), width, height, &image);
 	if (vaStatus != VA_STATUS_SUCCESS)
 	{
 		return vaStatus;
@@ -1720,7 +1720,7 @@ VAStatus crystalhd_QuerySurfaceStatus(
 VAStatus crystalhd_PutSurface(
    		VADriverContextP ctx,
 		VASurfaceID surface,
-		Drawable draw, /* X Drawable */
+		void *draw, /* Drawable of window system */
 		short srcx,
 		short srcy,
 		unsigned short srcw,

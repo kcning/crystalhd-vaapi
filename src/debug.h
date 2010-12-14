@@ -53,7 +53,8 @@
 		char dump_buf_file[200] = { 0 }; \
 		sprintf(dump_buf_file, FILENAME, __VA_ARGS__); \
 		FILE * dump_buf = fopen(dump_buf_file, "w"); \
-		if (fwrite(BUF, SIZE, 1, dump_buf) < 0) \
+		size_t wrote_bytes = fwrite(BUF, SIZE, 1, dump_buf); \
+		if (wrote_bytes < 0) \
 			crystalhd__error_message("cannot dump buffer to %s\n", dump_buf_file); \
 		fclose(dump_buf); \
 	} while (0);

@@ -447,7 +447,7 @@ VAStatus crystalhd_render_slice_data_buffer_h264(
 			obj_buffer->buffer_data, obj_buffer->element_size * obj_buffer->num_elements);
 	}
 	obj_surface->data_size = obj_surface->data_size + (3 + obj_buffer->element_size) * obj_buffer->num_elements;
-	DUMP_BUFFER(obj_surface->data, obj_surface->data_size, "crystalhd-video_data_0x%08x", obj_surface->data);
+	DUMP_BUFFER(obj_surface->data, obj_surface->data_size, "crystalhd-video_data_%p", obj_surface->data);
 
 	crystalhd_DestroyBuffer(ctx, obj_buffer->base.id);
 
@@ -479,7 +479,7 @@ VAStatus crystalhd_end_picture_h264(
 		crystalhd__error_message("%s: Unable to send data. status = %d\n", __func__, sts);
 		return VA_STATUS_ERROR_OPERATION_FAILED;
 	}
-	DUMP_BUFFER(obj_surface->data, obj_surface->data_size, "crystalhd-video_data_0x%08x", obj_surface->data);
+	DUMP_BUFFER(obj_surface->data, obj_surface->data_size, "crystalhd-video_data_%p", obj_surface->data);
 
 	return VA_STATUS_SUCCESS;
 }
