@@ -28,7 +28,6 @@ source_h =			\
 source_c =			\
 	crystalhd_drv_video.c	\
 	crystalhd_video_h264.c	\
-	debug.c			\
 	object_heap.c		\
 	$(source_glx_c)		\
 	$(source_x11_c)

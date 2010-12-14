@@ -45,7 +45,7 @@
 #define CRYSTALHD_MAX_IMAGE_FORMATS		5
 #define CRYSTALHD_MAX_SUBPIC_FORMATS		4
 #define CRYSTALHD_MAX_DISPLAY_ATTRIBUTES	4
-#define CRYSTALHD_STR_VENDOR			"Broadcom Crystal HD Video Decoder " RC_PRODUCT_VERSION
+#define CRYSTALHD_STR_VENDOR			"Broadcom Crystal HD Video Decoder " RC_FILE_VERSION
 
 #define ALIGN(i, n)		(((i) + (n) - 1) & ~((n) - 1))
 #define STRIDE(w)		(((w) + 0xf) & ~0xf)
@@ -63,10 +63,6 @@
 #define SURFACE(id)	((object_surface_p) object_heap_lookup( &driver_data->surface_heap, id ))
 #define BUFFER(id)	((object_buffer_p) object_heap_lookup( &driver_data->buffer_heap, id ))
 #define IMAGE(id)	((object_image_p) object_heap_lookup( &driver_data->image_heap, id ))
-
-#define INSTRUMENT_CALL			crystalhd__information_message("%s (#%d): being called\n", __func__, __LINE__);
-#define INSTRUMENT_RET			crystalhd__information_message("%s (#%d): returned\n", __func__, __LINE__);
-#define INSTRUMENT_CHECKPOINT(n)	crystalhd__information_message("%s (#%d): checkpoint %d\n", __func__, __LINE__, n);
 
 struct crystalhd_driver_data
 {

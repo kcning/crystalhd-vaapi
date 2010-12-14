@@ -177,7 +177,6 @@ VAStatus crystalhd_GetConfigAttributes(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 
 	int i;
 
@@ -198,7 +197,6 @@ VAStatus crystalhd_GetConfigAttributes(
 		}
 	}
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -236,7 +234,6 @@ VAStatus crystalhd_CreateConfig(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	VAStatus vaStatus;
 	int configID;
 	object_config_p obj_config;
@@ -306,7 +303,6 @@ VAStatus crystalhd_CreateConfig(
 
 	if (VA_STATUS_SUCCESS != vaStatus)
 	{
-		INSTRUMENT_RET;
 		return vaStatus;
 	}
 
@@ -315,7 +311,6 @@ VAStatus crystalhd_CreateConfig(
 	if (NULL == obj_config)
 	{
 		vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
-		INSTRUMENT_RET;
 		return vaStatus;
 	}
 
@@ -344,7 +339,6 @@ VAStatus crystalhd_CreateConfig(
 		*config_id = configID;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -354,7 +348,7 @@ VAStatus crystalhd_DestroyConfig(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus;
 	object_config_p obj_config;
 
@@ -362,12 +356,10 @@ VAStatus crystalhd_DestroyConfig(
 	if (NULL == obj_config)
 	{
 		vaStatus = VA_STATUS_ERROR_INVALID_CONFIG;
-		INSTRUMENT_RET;
 		return vaStatus;
 	}
 
 	object_heap_free( &driver_data->config_heap, (object_base_p) obj_config);
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -381,7 +373,7 @@ VAStatus crystalhd_QueryConfigAttributes(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_config_p obj_config;
 	int i;
@@ -397,7 +389,6 @@ VAStatus crystalhd_QueryConfigAttributes(
 		attrib_list[i] = obj_config->attrib_list[i];
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -411,14 +402,13 @@ VAStatus crystalhd_CreateSurfaces(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	int i;
 
 	/* We only support one format */
 	if (VA_RT_FORMAT_YUV420 != format)
 	{
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_UNSUPPORTED_RT_FORMAT;
 	}
 
@@ -450,7 +440,6 @@ VAStatus crystalhd_CreateSurfaces(
 		}
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -461,7 +450,7 @@ VAStatus crystalhd_DestroySurfaces(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	int i;
 	for(i = num_surfaces; i--; )
 	{
@@ -476,7 +465,6 @@ VAStatus crystalhd_DestroySurfaces(
 
 		object_heap_free( &driver_data->surface_heap, (object_base_p) obj_surface);
 	}
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -487,7 +475,6 @@ VAStatus crystalhd_QueryImageFormats(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	int n;
 	for (n = 0; crystalhd_image_formats_map[n].va_format.fourcc != 0; ++n) {
@@ -499,7 +486,6 @@ VAStatus crystalhd_QueryImageFormats(
 	if (num_formats)
 		*num_formats = n;
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -512,7 +498,7 @@ VAStatus crystalhd_CreateImage(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	object_image_p obj_image;
 	VAImageID image_id;
 	unsigned int width2, height2, size2, size;
@@ -615,12 +601,11 @@ VAStatus crystalhd_CreateImage(
 
 	*out_image = *image;
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 
 error:
 	crystalhd_DestroyImage(ctx, image_id);
-	INSTRUMENT_RET;
+
 	return VA_STATUS_ERROR_OPERATION_FAILED;
 }
 
@@ -640,7 +625,6 @@ VAStatus crystalhd_DestroyImage(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 
 	object_image_p obj_image = IMAGE(image);
 	if (obj_image)
@@ -654,7 +638,6 @@ VAStatus crystalhd_DestroyImage(
 		object_heap_free(&driver_data->image_heap, (object_base_p)obj_image);
 	}
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -665,10 +648,9 @@ VAStatus crystalhd_SetImagePalette(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -683,26 +665,22 @@ VAStatus crystalhd_GetImage(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 
 	object_surface_p obj_surface = SURFACE(surface);
 	if (NULL == obj_surface)
 	{
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_INVALID_SURFACE;
 	}
 
 	object_image_p obj_output_image = IMAGE(obj_surface->output_image_id);
 	if (NULL == obj_output_image)
 	{
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_INVALID_IMAGE;
 	}
 
 	object_image_p obj_image = IMAGE(image);
 	if (NULL == obj_image)
 	{
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_INVALID_IMAGE;
 	}
 
@@ -733,7 +711,6 @@ VAStatus crystalhd_GetImage(
 	crystalhd__information_message("0x%08x 0x%08x\n", obj_image->image.data_size, obj_output_image->image.data_size);
 	INSTRUMENT_CHECKPOINT(2);
 	
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -752,10 +729,9 @@ VAStatus crystalhd_PutImage(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -767,10 +743,9 @@ VAStatus crystalhd_QuerySubpictureFormats(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -781,10 +756,9 @@ VAStatus crystalhd_CreateSubpicture(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -794,10 +768,9 @@ VAStatus crystalhd_DestroySubpicture(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -808,10 +781,9 @@ VAStatus crystalhd_SetSubpictureImage(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -827,10 +799,9 @@ VAStatus crystalhd_SetSubpicturePalette(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -843,10 +814,9 @@ VAStatus crystalhd_SetSubpictureChromakey(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -857,10 +827,9 @@ VAStatus crystalhd_SetSubpictureGlobalAlpha(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_SUCCESS;
 }
 
@@ -886,10 +855,9 @@ VAStatus crystalhd_AssociateSubpicture(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
 
@@ -901,10 +869,9 @@ VAStatus crystalhd_DeassociateSubpicture(
 )
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 	
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
 
@@ -920,7 +887,7 @@ VAStatus crystalhd_CreateContext(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_config_p obj_config;
 	int i;
@@ -930,7 +897,6 @@ VAStatus crystalhd_CreateContext(
 	if (NULL == obj_config)
 	{
 		vaStatus = VA_STATUS_ERROR_INVALID_CONFIG;
-		INSTRUMENT_RET;
 		return vaStatus;
 	}
 
@@ -943,7 +909,6 @@ VAStatus crystalhd_CreateContext(
 	if (NULL == obj_context)
 	{
 		vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
-		INSTRUMENT_RET;
 		return vaStatus;
 	}
 
@@ -963,7 +928,6 @@ VAStatus crystalhd_CreateContext(
 	obj_context->render_targets = (VASurfaceID *) malloc(num_render_targets * sizeof(VASurfaceID));
 	if (obj_context->render_targets == NULL)
 	{
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_ALLOCATION_FAILED;
 	}
 	
@@ -1010,7 +974,6 @@ VAStatus crystalhd_CreateContext(
 			break;
 #endif
 		default:
-			INSTRUMENT_RET;
 			return VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 	sts = DtsSetVideoParams(driver_data->hdev, bc_algo, TRUE, FALSE, TRUE, 0);
@@ -1034,7 +997,6 @@ VAStatus crystalhd_CreateContext(
 		object_heap_free( &driver_data->context_heap, (object_base_p) obj_context);
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1045,7 +1007,7 @@ VAStatus crystalhd_DestroyContext(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	object_context_p obj_context = CONTEXT(context);
 	assert(obj_context);
 
@@ -1069,7 +1031,6 @@ VAStatus crystalhd_DestroyContext(
 
 	object_heap_free( &driver_data->context_heap, (object_base_p) obj_context);
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -1092,7 +1053,7 @@ VAStatus crystalhd_CreateBuffer(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	int bufferID;
 	object_buffer_p obj_buffer;
@@ -1115,7 +1076,6 @@ VAStatus crystalhd_CreateBuffer(
 		default:
 			INSTRUMENT_CHECKPOINT(type);
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_BUFFERTYPE;
-			INSTRUMENT_RET;
 			return vaStatus;
 	}
 
@@ -1126,7 +1086,6 @@ VAStatus crystalhd_CreateBuffer(
 	if (NULL == obj_buffer)
 	{
 		vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
-		INSTRUMENT_RET;
 		return vaStatus;
 	}
 
@@ -1146,7 +1105,6 @@ VAStatus crystalhd_CreateBuffer(
 		*buf_id = bufferID;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1157,7 +1115,7 @@ VAStatus crystalhd_BufferSetNumElements(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_buffer_p obj_buffer = BUFFER(buf_id);
 	assert(obj_buffer);
@@ -1171,7 +1129,6 @@ VAStatus crystalhd_BufferSetNumElements(
 		obj_buffer->num_elements = num_elements;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1182,12 +1139,11 @@ VAStatus crystalhd_MapBuffer(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	object_buffer_p obj_buffer = BUFFER(buffer_id);
 
 	if (NULL == obj_buffer)
 	{
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_INVALID_BUFFER;
 	}
 
@@ -1196,7 +1152,6 @@ VAStatus crystalhd_MapBuffer(
 		*pbuf = obj_buffer->buffer_data;
 	}
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -1250,7 +1205,7 @@ VAStatus crystalhd_BeginPicture(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_context_p obj_context = CONTEXT(context);
 	assert(obj_context);
@@ -1290,7 +1245,6 @@ VAStatus crystalhd_BeginPicture(
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1302,10 +1256,9 @@ VAStatus crystalhd_render_picture_parameter_buffer_mpeg2(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
 	/* TODO */
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1316,10 +1269,9 @@ VAStatus crystalhd_render_picture_parameter_buffer_vc1(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
 	/* TODO */
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1330,10 +1282,9 @@ VAStatus crystalhd_render_picture_parameter_buffer_vc1mp(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
 	/* TODO */
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 #endif
@@ -1345,7 +1296,7 @@ VAStatus crystalhd_render_iqmatrix_buffer(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
 	object_config_p obj_config = CONFIG(obj_context->config_id);
 
@@ -1378,7 +1329,6 @@ VAStatus crystalhd_render_iqmatrix_buffer(
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1389,7 +1339,7 @@ VAStatus crystalhd_render_picture_parameter_buffer(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
 	object_config_p obj_config = CONFIG(obj_context->config_id);
 
@@ -1422,7 +1372,6 @@ VAStatus crystalhd_render_picture_parameter_buffer(
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1434,10 +1383,9 @@ VAStatus crystalhd_render_slice_parameter_buffer_mpeg2(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
 	/* TODO */
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1448,10 +1396,9 @@ VAStatus crystalhd_render_slice_parameter_buffer_vc1(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
 	/* TODO */
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1462,10 +1409,9 @@ VAStatus crystalhd_render_slice_parameter_buffer_vc1mp(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
 	/* TODO */
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 #endif
@@ -1477,7 +1423,7 @@ VAStatus crystalhd_render_slice_parameter_buffer(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+	
 	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
 	object_config_p obj_config = CONFIG(obj_context->config_id);
 
@@ -1512,7 +1458,6 @@ VAStatus crystalhd_render_slice_parameter_buffer(
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1523,7 +1468,7 @@ VAStatus crystalhd_render_slice_data_buffer(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
 	object_config_p obj_config = CONFIG(obj_context->config_id);
 
@@ -1558,7 +1503,6 @@ VAStatus crystalhd_render_slice_data_buffer(
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1570,7 +1514,7 @@ VAStatus crystalhd_RenderPicture(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
 	int i;
 
@@ -1588,7 +1532,6 @@ VAStatus crystalhd_RenderPicture(
 		assert(obj_buffer);
 		if (NULL == obj_buffer)
 		{
-			INSTRUMENT_RET;
 			return VA_STATUS_ERROR_INVALID_BUFFER;
 		}
 		crystalhd__information_message("%s: buffer[%d] = 0x%08x, type = %d\n", __func__, i, obj_buffer, obj_buffer->type);
@@ -1620,7 +1563,6 @@ VAStatus crystalhd_RenderPicture(
 		}
 	}
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1630,7 +1572,7 @@ VAStatus crystalhd_EndPicture(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	unsigned int width, height, width2, height2, flags;
 	VAImage image;
@@ -1690,7 +1632,6 @@ again:
 	vaStatus = crystalhd_CreateImage(ctx, &(crystalhd_image_formats_map[0].va_format), width, height, &image);
 	if (vaStatus != VA_STATUS_SUCCESS)
 	{
-		INSTRUMENT_RET;
 		return vaStatus;
 	}
 
@@ -1727,7 +1668,6 @@ again:
 		if (sts != BC_STS_SUCCESS)
 		{
 			crystalhd__information_message("status = %d\n", sts);
-			INSTRUMENT_RET;
 			return VA_STATUS_ERROR_OPERATION_FAILED;
 		}
 	}
@@ -1740,7 +1680,6 @@ again:
 
 	crystalhd__information_message("%s (#%d): I'm being called %d times.", __func__, __LINE__, ++xxx);
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1750,13 +1689,12 @@ VAStatus crystalhd_SyncSurface(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	//object_surface_p obj_surface;
 
 	//obj_surface = SURFACE(render_target);
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1767,7 +1705,7 @@ VAStatus crystalhd_QuerySurfaceStatus(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_surface_p obj_surface;
 
@@ -1776,7 +1714,6 @@ VAStatus crystalhd_QuerySurfaceStatus(
 
 	*status = VASurfaceReady;
 
-	INSTRUMENT_RET;
 	return vaStatus;
 }
 
@@ -1798,11 +1735,7 @@ VAStatus crystalhd_PutSurface(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 
-	
-
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -1819,12 +1752,10 @@ VAStatus crystalhd_QueryDisplayAttributes (
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 
 	if (num_attributes)
 		*num_attributes = 0;
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -1841,9 +1772,9 @@ VAStatus crystalhd_GetDisplayAttributes (
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
 
@@ -1860,9 +1791,9 @@ VAStatus crystalhd_SetDisplayAttributes (
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	/* TODO */
-	INSTRUMENT_RET;
+
 	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
 
@@ -1877,12 +1808,10 @@ VAStatus crystalhd_BufferInfo(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
 
 	object_buffer_p obj_buffer = BUFFER(buffer_id);
 	if (NULL == obj_buffer)
 	{
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_INVALID_BUFFER;
 	}
 
@@ -1895,7 +1824,6 @@ VAStatus crystalhd_BufferInfo(
 	if (NULL != num_elements)
 		*num_elements = obj_buffer->num_elements;
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -1914,9 +1842,7 @@ VAStatus crystalhd_LockSurface(
 		void **buffer
 	)
 {
-	INSTRUMENT_CALL;
 	/* TODO */
-	INSTRUMENT_RET;
 	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
 
@@ -1925,9 +1851,7 @@ VAStatus crystalhd_UnlockSurface(
 		VASurfaceID surface
 	)
 {
-	INSTRUMENT_CALL;
 	/* TODO */
-	INSTRUMENT_RET;
 	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
 #endif
@@ -1938,7 +1862,7 @@ crystalhd_Terminate(
 	)
 {
 	INIT_DRIVER_DATA;
-	INSTRUMENT_CALL;
+
 	object_buffer_p obj_buffer;
 	object_surface_p obj_surface;
 	object_context_p obj_context;
@@ -1988,7 +1912,6 @@ crystalhd_Terminate(
 
 	free(ctx->pDriverData);
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }
 
@@ -1997,7 +1920,6 @@ __vaDriverInit_0_31(
 		VADriverContextP ctx
 	)
 {
-	INSTRUMENT_CALL;
 	object_base_p obj;
 	int result;
 	struct crystalhd_driver_data *driver_data;
@@ -2069,7 +1991,6 @@ __vaDriverInit_0_31(
 	if ( sts != BC_STS_SUCCESS )
 	{
 		DtsDeviceClose(driver_data->hdev);
-		INSTRUMENT_RET;
 		return VA_STATUS_ERROR_OPERATION_FAILED;
 	}
 
@@ -2088,6 +2009,5 @@ __vaDriverInit_0_31(
 	result = object_heap_init( &driver_data->image_heap, sizeof(struct object_image), IMAGE_ID_OFFSET );
 	assert( result == 0 );
 
-	INSTRUMENT_RET;
 	return VA_STATUS_SUCCESS;
 }

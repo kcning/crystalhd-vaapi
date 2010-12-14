@@ -33,14 +33,20 @@
 #include "osdep.h"
 
 #ifdef USE_DEBUG
-inline void
-crystalhd__print_buffer(uint8_t *data, uint32_t size);
+#define crystalhd__print_buffer(data, size) \
+	{ \
+		unsigned int i = 0; \
+		printf("printing buffer with size 0x%08x\n", size); \
+		for (int i = 0;i < size; ++i) \
+			printf("0x%02x ", data[i]); \
+		printf("\n=====\n"); \
+	}
 
-inline void
-crystalhd__error_message(const char *msg, ...);
+#define crystalhd__error_message(format, ...) \
+	fprintf(stderr, "crystalhd_drv_video error: " format, ##__VA_ARGS__);
 
-inline void
-crystalhd__information_message(const char *msg, ...);
+#define crystalhd__information_message(format, ...) \
+	fprintf(stderr, "crystalhd_drv_video info: " format, ##__VA_ARGS__);
 
 #define DUMP_BUFFER(BUF, SIZE, FILENAME, ...) \
 	do { \
@@ -52,19 +58,16 @@ crystalhd__information_message(const char *msg, ...);
 		fclose(dump_buf); \
 	} while (0);
 
-#define INSTRUMENT_CALL			crystalhd__information_message("%s (#%d): being called\n", __func__, __LINE__);
-#define INSTRUMENT_RET			crystalhd__information_message("%s (#%d): returned\n", __func__, __LINE__);
-#define INSTRUMENT_CHECKPOINT(n)	crystalhd__information_message("%s (#%d): checkpoint %d\n", __func__, __LINE__, n);
+#define INSTRUMENT_CHECKPOINT(n) \
+	crystalhd__information_message("%s (%s:%d): checkpoint %d\n", __func__, __FILE__, __LINE__, n);
 
 #else
 
-#define crystalhd__print_buffer(data,size)
+#define crystalhd__print_buffer(data, size)
 #define crystalhd__error_message(msg, ...)
 #define crystalhd__information_message(msg, ...)
 #define DUMP_BUFFER(BUF, SIZE, FILENAME, ...)
 
-#define INSTRUMENT_CALL
-#define INSTRUMENT_RET
 #define INSTRUMENT_CHECKPOINT(n)
 
 #endif
