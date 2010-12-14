@@ -224,18 +224,22 @@ AC_MSG_RESULT([$LIBVA_DRIVERS_PATH])
 AC_SUBST(LIBVA_DRIVERS_PATH)
 
 dnl Check for CRYSTALHD
-AC_CACHE_CHECK([for CRYSTALHD],
-    ac_cv_have_crystalhd, [
-    saved_CFLAGS="$CFLAGS"
-    saved_LIBS="$LIBS"
-    CFLAGS="$CFLAGS -D__LINUX_USER__"
-    LIBS="$LIBS -lcrystalhd"
-    AC_TRY_LINK(
-    [#include <libcrystalhd/libcrystalhd_if.h>],
-    [void * hdev;DtsDeviceOpen(&hdev, 0)],
-    [ac_cv_have_crystalhd="yes" HAVE_CRYSTALHD=1],
-    [ac_cv_have_crystalhd="no"  HAVE_CRYSTALHD=0 LIBS="$saved_LIBS" CFLAGS="$saved_CFLAGS"])
-])
+AC_CHECK_HEADER(
+    [libcrystalhd/libcrystalhd_if.h],
+    [ac_cv_have_crystalhd_include="yes"],
+    [ac_cv_have_crystalhd_include="no"])
+AC_CHECK_LIB(
+    [crystalhd],
+    [DtsDeviceOpen],
+    [ac_cv_have_crystalhd_lib="yes"],
+    [ac_cv_have_crystalhd_lib="no"])
+
+ac_cv_have_crystalhd="no"
+if test "$ac_cv_have_crystalhd_lib:$ac_cv_have_crystalhd_include" = "yes:yes"; then
+    ac_cv_have_crystalhd="yes"
+fi
+AC_CACHE_CHECK([for Crystal HD], ac_cv_have_crystalhd)
+
 if test "$ac_cv_have_crystalhd" = "no"; then
     AC_MSG_ERROR([you need CRYSTALHD to build this package])
 fi
@@ -243,7 +247,7 @@ fi
 dnl Check for LIBCRYSTALHD version (poor man's check, no pkgconfig joy)
 CRYSTALHD_VERSION=`cat << EOF | $CC -E - | grep ^crystalhd_version | cut -d' ' -f2
 #include <libcrystalhd/libcrystalhd_version.h>
-crystalhd_version RC_PRODUCT_VERSION
+crystalhd_version DIL_RC_FILE_VERSION
 EOF
 `
 
@@ -272,4 +276,6 @@ echo VA-API version ................... : $VA_VERSION_STR
 echo VA-API drivers path .............. : $LIBVA_DRIVERS_PATH
 echo CRYSTALHD version ................ : $CRYSTALHD_VERSION
 echo GLX support ...................... : $(test $USE_GLX  -eq 1 && echo yes || echo no)
+echo Debug? ........................... : $enable_debug
+echo Tracer? .......................... : $enable_tracer
 echo
