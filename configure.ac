@@ -237,6 +237,8 @@ AC_CHECK_LIB(
 ac_cv_have_crystalhd="no"
 if test "$ac_cv_have_crystalhd_lib:$ac_cv_have_crystalhd_include" = "yes:yes"; then
     ac_cv_have_crystalhd="yes"
+    CFLAGS="$CFLAGS -D__LINUX_USER__"
+    LIBS="$LIBS -lcrystalhd"
 fi
 AC_CACHE_CHECK([for Crystal HD], ac_cv_have_crystalhd)
 
