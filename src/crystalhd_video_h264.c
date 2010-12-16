@@ -168,8 +168,6 @@ VAStatus crystalhd_render_slice_data_buffer_h264(
 {
 	INIT_DRIVER_DATA;
 
-	crystalhd_render_sps_pps_h264(ctx, obj_context);
-
 	object_surface_p obj_surface = SURFACE(obj_context->current_render_target);
 	int i;
 
@@ -202,6 +200,8 @@ VAStatus crystalhd_end_picture_h264(
 	)
 {
 	INIT_DRIVER_DATA;
+
+	crystalhd_render_sps_pps_h264(ctx, obj_context);
 
 	BC_STATUS sts;
 	if ( NULL != obj_surface->metadata && obj_surface->metadata_size > 0)
