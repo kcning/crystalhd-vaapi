@@ -25,15 +25,70 @@
 #ifndef _BITSTREAM_H_
 #define _BITSTREAM_H_
 
-#include "osdep.h"
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#else
+#include <inttypes.h>
+#endif
 
+#if defined(__GNUC__) && (__GNUC__ > 3 || __GNUC__ == 3 && __GNUC_MINOR__ > 0)
 #define ALWAYS_INLINE __attribute__((always_inline)) inline
 #define MAY_ALIAS __attribute__((may_alias))
+#else
+#define ALWAYS_INLINE inline
+#define MAY_ALIAS
+#endif
 
 typedef union { uint32_t i; uint16_t b[2]; uint8_t c[4]; } MAY_ALIAS x264_union32_t;
-
 #define WORD_SIZE sizeof(void*)
+
 #define M32(src) (((x264_union32_t*)(src))->i)
+
+#ifdef WORDS_BIGENDIAN
+#define endian_fix(x) (x)
+#define endian_fix64(x) (x)
+#define endian_fix32(x) (x)
+#define endian_fix16(x) (x)
+#else
+#if defined(__GNUC__) && defined(HAVE_MMX)
+static ALWAYS_INLINE uint32_t endian_fix32( uint32_t x )
+{
+    __asm__("bswap %0":"+r"(x));
+    return x;
+}
+#elif defined(__GNUC__) && defined(HAVE_ARMV6)
+static ALWAYS_INLINE uint32_t endian_fix32( uint32_t x )
+{
+    __asm__("rev %0, %0":"+r"(x));
+    return x;
+}
+#else
+static ALWAYS_INLINE uint32_t endian_fix32( uint32_t x )
+{
+    return (x<<24) + ((x<<8)&0xff0000) + ((x>>8)&0xff00) + (x>>24);
+}
+#endif
+#if defined(__GNUC__) && defined(ARCH_X86_64)
+static ALWAYS_INLINE uint64_t endian_fix64( uint64_t x )
+{
+    __asm__("bswap %0":"+r"(x));
+    return x;
+}
+#else
+static ALWAYS_INLINE uint64_t endian_fix64( uint64_t x )
+{
+    return endian_fix32(x>>32) + ((uint64_t)endian_fix32(x)<<32);
+}
+#endif
+static ALWAYS_INLINE intptr_t endian_fix( intptr_t x )
+{
+    return WORD_SIZE == 8 ? endian_fix64(x) : endian_fix32(x);
+}
+static ALWAYS_INLINE uint16_t endian_fix16( uint16_t x )
+{
+    return (x<<8)|(x>>8);
+}
+#endif
 
 typedef struct bs_s
 {
