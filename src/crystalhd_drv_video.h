@@ -35,26 +35,8 @@
 #include <libcrystalhd/libcrystalhd_if.h>
 #include <libcrystalhd/libcrystalhd_version.h>
 
+#include "common.h"
 #include "object_heap.h"
-
-#define DTS_OUTPUT_TIMEOUT			1000
-
-#define CRYSTALHD_MAX_PROFILES			11
-#define CRYSTALHD_MAX_ENTRYPOINTS		5
-#define CRYSTALHD_MAX_CONFIG_ATTRIBUTES		10
-#define CRYSTALHD_MAX_IMAGE_FORMATS		5
-#define CRYSTALHD_MAX_SUBPIC_FORMATS		4
-#define CRYSTALHD_MAX_DISPLAY_ATTRIBUTES	4
-#define CRYSTALHD_STR_VENDOR			"Broadcom Crystal HD Video Decoder " RC_FILE_VERSION
-
-#define ALIGN(i, n)		(((i) + (n) - 1) & ~((n) - 1))
-#define STRIDE(w)		(((w) + 0xf) & ~0xf)
-#define SIZE_YUV420(w, h)	((h) * (STRIDE(w) + STRIDE((w) >> 1)))
-
-#define CRYSTALHD_MIN(a, b)	(((a) < (b)) ? (a) : (b))
-#define CRYSTALHD_MAX(a, b)	(((a) > (b)) ? (a) : (b))
-#define CRYSTALHD_MIN3(a, b, c)	CRYSTALHD_MIN((a), (CRYSTALHD_MIN((b), (c))))
-#define CRYSTALHD_MAX3(a, b, c)	CRYSTALHD_MAX((a), (CRYSTALHD_MAX((b), (c))))
 
 #define INIT_DRIVER_DATA	struct crystalhd_driver_data *driver_data = get_crystalhd_driver_data(ctx);
 
