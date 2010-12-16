@@ -29,10 +29,38 @@
 
 #include <stdio.h>
 #include <stdarg.h>
-
-#include "osdep.h"
+#include <va/va.h>
 
 #ifdef USE_DEBUG
+static inline const char * string_of_VABufferType(VABufferType type)
+{
+	switch (type)
+	{
+#define BUFFERTYPE(buftype) case buftype: return #buftype
+		BUFFERTYPE(VAPictureParameterBufferType);
+		BUFFERTYPE(VAIQMatrixBufferType);
+		BUFFERTYPE(VABitPlaneBufferType);
+		BUFFERTYPE(VASliceGroupMapBufferType);
+		BUFFERTYPE(VASliceParameterBufferType);
+		BUFFERTYPE(VASliceDataBufferType);
+		BUFFERTYPE(VAMacroblockParameterBufferType);
+		BUFFERTYPE(VAResidualDataBufferType);
+		BUFFERTYPE(VADeblockingParameterBufferType);
+		BUFFERTYPE(VAImageBufferType);
+		BUFFERTYPE(VAProtectedSliceDataBufferType);
+		BUFFERTYPE(VAQMatrixBufferType);
+		/* Following are encode buffer types */
+		BUFFERTYPE(VAEncCodedBufferType);
+		BUFFERTYPE(VAEncSequenceParameterBufferType);
+		BUFFERTYPE(VAEncPictureParameterBufferType);
+		BUFFERTYPE(VAEncSliceParameterBufferType);
+		BUFFERTYPE(VAEncH264VUIBufferType);
+		BUFFERTYPE(VAEncH264SEIBufferType);
+#undef BUFFERTYPE
+	}
+	return "<unknown>";
+}
+
 #define crystalhd__print_buffer(data, size) \
 	{ \
 		unsigned int i = 0; \
@@ -51,7 +79,7 @@
 #define DUMP_BUFFER(BUF, SIZE, FILENAME, ...) \
 	do { \
 		char dump_buf_file[200] = { 0 }; \
-		sprintf(dump_buf_file, FILENAME, __VA_ARGS__); \
+		sprintf(dump_buf_file, "dump_" FILENAME, __VA_ARGS__); \
 		FILE * dump_buf = fopen(dump_buf_file, "w"); \
 		size_t wrote_bytes = fwrite(BUF, SIZE, 1, dump_buf); \
 		if (wrote_bytes < 0) \
@@ -64,6 +92,7 @@
 
 #else
 
+#define string_of_VABufferType(type)
 #define crystalhd__print_buffer(data, size)
 #define crystalhd__error_message(msg, ...)
 #define crystalhd__information_message(msg, ...)
