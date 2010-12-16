@@ -1,7 +1,7 @@
 DRIVERS  =
 
 INCLUDES = \
-	$(CRYSTALHD_VIDEO_CFLAGS)
+	$(CRYSTALHD_VIDEO_CFLAGS) -std=c99
 
 LDADD = \
 	$(CRYSTALHD_VIDEO_LT_LDFLAGS) -ldl -module \
@@ -22,12 +22,14 @@ source_h =			\
 	object_heap.h		\
 	osdep.h			\
 	crystalhd_drv_video.h	\
+	x264_encoder_set.h	\
 	$(source_glx_h)		\
 	$(source_x11_h)
 
 source_c =			\
 	crystalhd_drv_video.c	\
 	crystalhd_video_h264.c	\
+	x264_encoder_set.c	\
 	object_heap.c		\
 	$(source_glx_c)		\
 	$(source_x11_c)
