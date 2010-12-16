@@ -1,3 +1,3 @@
 #!/bin/bash
 
-echo export LD_PRELOAD=\"$(pwd)/crystalhd_wrapper.so\"
+echo export LD_PRELOAD="$(basename ${0})/crystalhd_wrapper.so"
