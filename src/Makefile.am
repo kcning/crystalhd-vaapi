@@ -20,7 +20,6 @@ source_h =			\
 	debug.h			\
 	crystalhd_video_h264.h	\
 	object_heap.h		\
-	osdep.h			\
 	crystalhd_drv_video.h	\
 	x264_encoder_set.h	\
 	$(source_glx_h)		\

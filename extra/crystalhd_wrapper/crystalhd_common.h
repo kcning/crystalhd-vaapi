@@ -66,36 +66,47 @@ const char *string_of_BC_MEDIA_SUBTYPE(BC_MEDIA_SUBTYPE);
 		return ret; \
 	}
 
+#define DUMP_BUFFER(BUF, SIZE, FILENAME, ...) \
+	do { \
+		char dump_buf_file[200] = { 0 }; \
+		sprintf(dump_buf_file, "dump_" FILENAME, __VA_ARGS__); \
+		FILE * dump_buf = fopen(dump_buf_file, "w"); \
+		size_t wrote_bytes = fwrite(BUF, SIZE, 1, dump_buf); \
+		if (wrote_bytes < 0) \
+		crystalhd__error_message("cannot dump buffer to %s\n", dump_buf_file); \
+		fclose(dump_buf); \
+	} while (0);
+
 #define dump_data(header, data, size) \
 	do { \
-		int i; \
+		int i, last_startcode = 0, *n; \
 		eprintf("%s: data = %p, size = %u\n", header, data, size); \
 		eprintf("  "); \
-		for (i = 0;i < MIN(size, 100);++i) \
+		for (i = 0;i < size; ++i) \
 		{ \
-			if (i && (i+3 < MIN(size, 100))) \
+			n = (int *)(data + i); \
+			/* little endian on my x86-64 machine, */ \
+			/* 0x01000000 == 0x00 0x00 0x00 0x01, 0x00010000 == 0x00 0x00 0x01 0x00 */ \
+			if (*n == 0x01000000 || (*n & 0x00ffffff) == 0x00010000) \
 			{ \
-				if (i && data[i] == 0x00 && data[i+1] == 0x00 && data[i+2] == 0x00 && data[i+3] == 0x01) \
+				printf("%s(%d bytes)\n", ((i > last_startcode + 100)?"... ":""), i - last_startcode); \
+				if (*n == 0x01000000) \
 				{ \
-					printf("(%d)\n", i); \
-					eprintf("  "); \
+					eprintf("  00 00 00 01 "); \
+					i += 4; \
+				} else {\
+					eprintf("  00 00 01 "); \
+					i += 3; \
 				} \
+				last_startcode = i; \
 			} \
-			if (i && (i+2 < MIN(size, 100))) \
-			{ \
-				if (i && data[i-1] != 0x00 && data[i] == 0x00 && data[i+1] == 0x00 && data[i+2] == 0x01) \
-				{ \
-					printf("(%d)\n", i); \
-					eprintf("  "); \
-				} \
-			} \
-			printf("%02x ", data[i]); \
+			if (i < last_startcode + 100) \
+				printf("%02x ", data[i]); \
 		} \
-		if (size > 100) \
-			printf("(%d) ... ", i); \
-		else \
-			printf("(%d) ", i); \
-		printf("\b\n"); \
+		if (i > last_startcode + 100) \
+			printf("... "); \
+		printf("(%d bytes)\n", i - last_startcode); \
+		DUMP_BUFFER(data, size, "crystalhd_wrapper-data_%016p", data); \
 	} while (0);
 
 #endif

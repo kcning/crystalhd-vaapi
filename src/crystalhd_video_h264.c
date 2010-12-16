@@ -189,7 +189,6 @@ VAStatus crystalhd_render_slice_data_buffer_h264(
 			obj_buffer->buffer_data, obj_buffer->element_size * obj_buffer->num_elements);
 	}
 	obj_surface->data_size = obj_surface->data_size + (4 + obj_buffer->element_size) * obj_buffer->num_elements;
-	DUMP_BUFFER(obj_surface->data, obj_surface->data_size, "crystalhd-video_data_%p", obj_surface->data);
 
 	crystalhd_DestroyBuffer(ctx, obj_buffer->base.id);
 
@@ -205,7 +204,6 @@ VAStatus crystalhd_end_picture_h264(
 	INIT_DRIVER_DATA;
 
 	BC_STATUS sts;
-
 	if ( NULL != obj_surface->metadata && obj_surface->metadata_size > 0)
 	{
 		sts = DtsProcInput(driver_data->hdev, obj_surface->metadata, obj_surface->metadata_size, 0, FALSE);
@@ -214,7 +212,6 @@ VAStatus crystalhd_end_picture_h264(
 			crystalhd__error_message("%s: Unable to send metadata (surface). status = %d\n", __func__, sts);
 			return VA_STATUS_ERROR_OPERATION_FAILED;
 		}
-		DUMP_BUFFER(obj_surface->metadata, obj_surface->metadata_size, "crystalhd-video_metadata_surface_%p", obj_surface->metadata);
 	}
 
 	if ( NULL != obj_context->metadata && obj_context->metadata_size > 0)
@@ -222,10 +219,9 @@ VAStatus crystalhd_end_picture_h264(
 		sts = DtsProcInput(driver_data->hdev, obj_context->metadata, obj_context->metadata_size, 0, FALSE);
 		if (sts != BC_STS_SUCCESS)
 		{
-			crystalhd__error_message("%s: Unable to send metadata (from context). status = %d\n", __func__, sts);
+			crystalhd__error_message("%s: Unable to send metadata (context). status = %d\n", __func__, sts);
 			return VA_STATUS_ERROR_OPERATION_FAILED;
 		}
-		DUMP_BUFFER(obj_context->metadata, obj_context->metadata_size, "crystalhd-video_metadata_context_%p", obj_context->metadata);
 	}
 
 	sts = DtsProcInput(driver_data->hdev, obj_surface->data, obj_surface->data_size, 0, FALSE);
@@ -234,7 +230,6 @@ VAStatus crystalhd_end_picture_h264(
 		crystalhd__error_message("%s: Unable to send data. status = %d\n", __func__, sts);
 		return VA_STATUS_ERROR_OPERATION_FAILED;
 	}
-	DUMP_BUFFER(obj_surface->data, obj_surface->data_size, "crystalhd-video_data_%p", obj_surface->data);
 
 	return VA_STATUS_SUCCESS;
 }
