@@ -32,6 +32,29 @@
 #include <va/va.h>
 
 #ifdef USE_DEBUG
+static inline const char * string_of_VAProfile(VAProfile profile)
+{
+	switch (profile)
+	{
+#define VAPROFILE(p) case VAProfile ##p: return "VAProfile" #p
+		VAPROFILE(MPEG2Simple);
+		VAPROFILE(MPEG2Main);
+		VAPROFILE(MPEG4Simple);
+		VAPROFILE(MPEG4AdvancedSimple);
+		VAPROFILE(MPEG4Main);
+		VAPROFILE(H264Baseline);
+		VAPROFILE(H264Main);
+		VAPROFILE(H264High);
+		VAPROFILE(VC1Simple);
+		VAPROFILE(VC1Main);
+		VAPROFILE(VC1Advanced);
+		VAPROFILE(H263Baseline);
+		VAPROFILE(JPEGBaseline);
+#undef VAPROFILE
+	}
+	return "<unknown>";
+}
+
 static inline const char * string_of_VABufferType(VABufferType type)
 {
 	switch (type)

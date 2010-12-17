@@ -180,6 +180,13 @@ VAStatus crystalhd_render_sps_pps_h264(
 	INIT_DRIVER_DATA;
 
 	VAStatus vaStatus = VA_STATUS_ERROR_UNKNOWN;
+	object_config_p obj_config = CONFIG(obj_context->config_id);
+	if (NULL == obj_config)
+	{
+		vaStatus = VA_STATUS_ERROR_INVALID_CONFIG;
+		goto error;
+	}
+
 	uint8_t metadata[500] = { 0x00 };
 	bs_t bs;
 
@@ -212,8 +219,11 @@ VAStatus crystalhd_render_sps_pps_h264(
 
 	x264_sps_t sps;
 	x264_pps_t pps;
+	
+	memset(&sps, 0, sizeof(sps));
+	memset(&pps, 0, sizeof(pps));
 
-	x264_sps_init( &sps, obj_context->last_h264_sps_id++, pic_param, slice_param, obj_context );
+	x264_sps_init( &sps, obj_context->last_h264_sps_id++, obj_config->profile, pic_param, slice_param, obj_context );
 	x264_pps_init( &pps, obj_context->last_h264_pps_id++, &sps, pic_param, slice_param, iqmatrix );
 
 	x264_sps_write( &bs, &sps );

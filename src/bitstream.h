@@ -245,7 +245,8 @@ static ALWAYS_INLINE void bs_write_ue_big( bs_t *s, unsigned int val )
         size += 16;
         tmp >>= 8;
     }
-    size += x264_ue_size_tab[tmp];
+    if (tmp > 0 && tmp < sizeof(x264_ue_size_tab) / sizeof(*x264_ue_size_tab))
+	    size += x264_ue_size_tab[tmp];
     bs_write( s, size>>1, 0 );
     bs_write( s, (size>>1)+1, val );
 }

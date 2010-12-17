@@ -237,6 +237,7 @@ int frame_only;  /* forbid interlacing */
 void x264_sps_init(
 	x264_sps_t *sps,
 	int i_id,
+	VAProfile va_profile,
 	VAPictureParameterBufferH264 const * const pic_param,
 	VASliceParameterBufferH264 const * const slice_param,
 	const object_context_p const obj_context

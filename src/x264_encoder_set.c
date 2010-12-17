@@ -49,8 +49,8 @@ static inline void transpose( uint8_t *buf, int w )
 
 const x264_level_t x264_levels[] =
 {
-	{  9,   1485,    99,   152064,    128,    350,  64, 64,  0, 2, 0, 0, 1 }, /* "1b" */
 	{ 10,   1485,    99,   152064,     64,    175,  64, 64,  0, 2, 0, 0, 1 },
+	{  9,   1485,    99,   152064,    128,    350,  64, 64,  0, 2, 0, 0, 1 }, /* "1b" */
 	{ 11,   3000,   396,   345600,    192,    500, 128, 64,  0, 2, 0, 0, 1 },
 	{ 12,   6000,   396,   912384,    384,   1000, 128, 64,  0, 2, 0, 0, 1 },
 	{ 13,  11880,   396,   912384,    768,   2000, 128, 64,  0, 2, 0, 0, 1 },
@@ -70,7 +70,6 @@ const x264_level_t x264_levels[] =
 
 static inline int __estimate_level_idc(
 	int profile_idc,
-	int level_idc,
 	VAPictureParameterBufferH264 const * const pic_param,
 	VASliceParameterBufferH264 const * const slice_param
 )
@@ -78,13 +77,16 @@ static inline int __estimate_level_idc(
 	int mbs = (pic_param->picture_width_in_mbs_minus1 + 1) * (pic_param->picture_height_in_mbs_minus1 + 1);
 	int dpb = mbs * 384 * CRYSTALHD_MIN(16, CRYSTALHD_MAX3(pic_param->num_ref_frames, pic_param->frame_num, 5));
 	int cbp_factor = ((profile_idc == PROFILE_HIGH10) ? 12 : ((profile_idc == PROFILE_HIGH) ? 5 : 4));
+	crystalhd__information_message("%s: mbs = %d, dpb = %d, cbp_factor = %d\n", __func__, mbs, dpb, cbp_factor);
 
 	const x264_level_t *l = x264_levels;
 
 #define CHECK( test ) \
 	while( l->level_idc != 0 && (test) ) \
-		++l;
-	CHECK( l->level_idc < level_idc );
+	{ \
+		crystalhd__information_message("assert \"" #test "\" for level_idc %d failed.\n", l->level_idc);\
+		++l; \
+	}
 	CHECK( l->frame_size < mbs );
 	CHECK( l->frame_size * 8 < (pic_param->picture_width_in_mbs_minus1 + 1) * (pic_param->picture_width_in_mbs_minus1 + 1) );
 	CHECK( l->frame_size * 8 < (pic_param->picture_height_in_mbs_minus1 + 1) * (pic_param->picture_height_in_mbs_minus1 + 1) );
@@ -96,6 +98,9 @@ static inline int __estimate_level_idc(
 	//if( h->_param.i_fps_den > 0 )
 	//	CHECK( "MB rate", l->mbps, (int64_t)mbs * h->_param.i_fps_num / h->_param.i_fps_den );
 #undef CHECK
+
+	if ((l+1)->level_idc != 0)
+		++l;
 
 	return l->level_idc;
 }
@@ -215,16 +220,28 @@ static inline void scaling_list_write( bs_t *s, x264_pps_t *pps, int idx )
 void x264_sps_init(
 	x264_sps_t *sps,
 	int i_id,
+	VAProfile va_profile,
 	VAPictureParameterBufferH264 const * const pic_param,
 	VASliceParameterBufferH264 const * const slice_param,
 	const object_context_p const obj_context )
 {
 	sps->i_id = i_id;
-	sps->i_mb_width = pic_param->picture_width_in_mbs_minus1;
-	sps->i_mb_height= pic_param->picture_height_in_mbs_minus1;
+	sps->i_mb_width = pic_param->picture_width_in_mbs_minus1 + 1;
+	sps->i_mb_height= pic_param->picture_height_in_mbs_minus1 + 1;
 
 	/* FIXME: sps->b_qpprime_y_zero_transform_bypass = _param->rc.i_rc_method == X264_RC_CQP && _param->rc.i_qp_constant == 0; */
 	sps->b_qpprime_y_zero_transform_bypass = 0;
+
+	if ( va_profile == VAProfileH264Baseline )
+		sps->i_profile_idc = PROFILE_BASELINE;
+	else if ( va_profile == VAProfileH264Main )
+		sps->i_profile_idc = PROFILE_MAIN;
+	else if ( va_profile == VAProfileH264High )
+		sps->i_profile_idc = PROFILE_HIGH;
+	else
+		/* should fail here = = */;
+
+#if 0
 	if( sps->b_qpprime_y_zero_transform_bypass )
 		sps->i_profile_idc  = PROFILE_HIGH444_PREDICTIVE;
 	else if( pic_param->bit_depth_luma_minus8 || pic_param->bit_depth_chroma_minus8 )
@@ -237,20 +254,18 @@ void x264_sps_init(
 		sps->i_profile_idc  = PROFILE_MAIN;
 	else
 		sps->i_profile_idc  = PROFILE_BASELINE;
+#endif
 
 	sps->b_constraint_set0  = sps->i_profile_idc == PROFILE_BASELINE;
-	/* x264 doesn't support the features that are in Baseline and not in Main,
-	 * namely arbitrary_slice_order and slice_groups. */
 	sps->b_constraint_set1  = sps->i_profile_idc <= PROFILE_MAIN;
-	/* Never set constraint_set2, it is not necessary and not used in real world. */
 	sps->b_constraint_set2  = 0;
 	sps->b_constraint_set3  = 0;
 
-	sps->i_level_idc = __estimate_level_idc(sps->i_profile_idc, sps->i_level_idc, pic_param, slice_param);
+	sps->i_level_idc = __estimate_level_idc(sps->i_profile_idc, pic_param, slice_param);
 	if( sps->i_level_idc == 9 && ( sps->i_profile_idc >= PROFILE_BASELINE && sps->i_profile_idc <= PROFILE_EXTENDED ) )
 	{
 		sps->b_constraint_set3 = 1; /* level 1b with Baseline, Main or Extended profile is signalled via constraint_set3 */
-		sps->i_level_idc	  = 11;
+		sps->i_level_idc = 11;
 	}
 	/* High 10 Intra profile */
 	sps->b_constraint_set3 = sps->i_profile_idc == PROFILE_HIGH10;
@@ -302,8 +317,10 @@ void x264_sps_init(
 	sps->crop.i_bottom	= (sps->i_mb_height*16 - obj_context->picture_height) >> !pic_param->seq_fields.bits.frame_mbs_only_flag;
 	sps->b_crop		= sps->crop.i_left || sps->crop.i_top || sps->crop.i_right || sps->crop.i_bottom;
 
-	// assume no aspect info
-	sps->vui.b_aspect_ratio_info_present = 0;
+	// assume square aspect ratio
+	sps->vui.b_aspect_ratio_info_present = 1;
+	sps->vui.i_sar_width = 1;
+	sps->vui.i_sar_height = 1;
 	/*
 	if( param->vui.i_sar_width > 0 && param->vui.i_sar_height > 0 )
 	{
@@ -324,10 +341,8 @@ void x264_sps_init(
 
 	sps->vui.b_signal_type_present = 0;
 	// huh? what're these?
-	sps->vui.i_vidformat = 5;
-	sps->vui.b_fullrange = 0;
-	//sps->vui.i_vidformat = ( param->vui.i_vidformat <= 5 ? param->vui.i_vidformat : 5 );
-	//sps->vui.b_fullrange = ( param->vui.b_fullrange ? 1 : 0 );
+	sps->vui.i_vidformat = 5; // ( param->vui.i_vidformat <= 5 ? param->vui.i_vidformat : 5 );
+	sps->vui.b_fullrange = 0; // ( param->vui.b_fullrange ? 1 : 0 );
 	sps->vui.b_color_description_present = 0;
 
 	// assume no color descriptions */
@@ -364,7 +379,11 @@ void x264_sps_init(
 	}
 	*/
 
-	// assume no timing info
+	// FIXME: faking timing info
+	sps->vui.b_timing_info_present = 1;
+	sps->vui.i_num_units_in_tick = 0;
+	sps->vui.i_time_scale = 0;
+	sps->vui.b_fixed_frame_rate = 0;
 	/*
 	sps->vui.b_timing_info_present = param->i_timebase_num > 0 && param->i_timebase_den > 0;
 	if( sps->vui.b_timing_info_present )
@@ -392,7 +411,8 @@ void x264_sps_init(
 		sps->vui.b_motion_vectors_over_pic_boundaries = 1;
 		sps->vui.i_max_bytes_per_pic_denom = 0;
 		sps->vui.i_max_bits_per_mb_denom = 0;
-		// hun?
+		// FIXME: hun???
+		sps->vui.i_log2_max_mv_length_horizontal = sps->vui.i_log2_max_mv_length_vertical = 9;
 		/*
 		sps->vui.i_log2_max_mv_length_horizontal =
 		sps->vui.i_log2_max_mv_length_vertical = (int)log2f( CRYSTALHD_MAX( 1, param->analyse.i_mv_range*4-1 ) ) + 1;
