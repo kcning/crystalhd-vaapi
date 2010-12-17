@@ -80,14 +80,14 @@ const char *string_of_BC_MEDIA_SUBTYPE(BC_MEDIA_SUBTYPE);
 #define dump_data(header, data, size) \
 	do { \
 		int i, last_startcode = 0, *n; \
-		eprintf("%s: data = %p, size = %u\n", header, data, size); \
+		eprintf("%s: data = %016p, size = %u\n", header, data, size); \
 		eprintf("  "); \
 		for (i = 0;i < size; ++i) \
 		{ \
 			n = (int *)(data + i); \
 			/* little endian on my x86-64 machine, */ \
 			/* 0x01000000 == 0x00 0x00 0x00 0x01, 0x00010000 == 0x00 0x00 0x01 0x00 */ \
-			if (*n == 0x01000000 || (*n & 0x00ffffff) == 0x00010000) \
+			if (i != 0 && i != 1 && (*n == 0x01000000 || (*n & 0x00ffffff) == 0x00010000)) \
 			{ \
 				printf("%s(%d bytes)\n", ((i > last_startcode + 100)?"... ":""), i - last_startcode); \
 				if (*n == 0x01000000) \
