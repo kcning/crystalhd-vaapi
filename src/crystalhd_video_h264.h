@@ -32,6 +32,12 @@
 #include "crystalhd_drv_video.h"
 
 VAStatus
+crystalhd_prepare_decoder_h264(
+	VADriverContextP ctx,
+	object_context_p obj_context
+);
+
+VAStatus
 crystalhd_render_iqmatrix_buffer_h264(
 	VADriverContextP ctx,
 	object_context_p obj_context,

@@ -39,6 +39,75 @@
 #include "crystalhd_video_h264.h"
 #include "x264_encoder_set.h"
 
+VAStatus crystalhd_prepare_decoder_h264(
+	VADriverContextP ctx,
+	object_context_p obj_context
+)
+{
+	INIT_DRIVER_DATA;
+
+	VAStatus vaStatus = VA_STATUS_SUCCESS;
+
+	BC_INPUT_FORMAT bcInputFormat = {
+		.FGTEnable	= FALSE,
+		.MetaDataEnable	= FALSE,
+		.Progressive	= TRUE,
+		.OptFlags	= 0,		/* FIXME: Should we enable BD mode and max frame rate mode for LINK? */
+		.mSubtype	= BC_MSUBTYPE_H264,
+		.width		= obj_context->picture_width,
+		.height		= obj_context->picture_height,
+		.startCodeSz	= 3,
+		.pMetaData	= obj_context->metadata,
+		.metaDataSz	= obj_context->metadata_size,
+		.bEnableScaling	= FALSE,
+		/* we're not using HW Scaling so ScalingParams is irrelevant, but we still set it up here */
+		.ScalingParams	= {
+			.sWidth		= obj_context->picture_width,
+			.sHeight	= obj_context->picture_height,
+			.DNR		= 0,	/* What's DNR? Do Not Resize??? */
+			.Reserved1	= 0,
+			.Reserved2	= NULL,
+			.Reserved3	= 0,
+			.Reserved4	= NULL,
+		},
+	};
+
+	if ( BC_STS_SUCCESS != DtsOpenDecoder(driver_data->hdev, BC_STREAM_TYPE_ES) )
+	{
+		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
+		goto error;
+	}
+
+	if ( BC_STS_SUCCESS != DtsSetInputFormat(driver_data->hdev, &bcInputFormat) )
+	{
+		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
+		goto error_CloseDecoder;
+	}
+
+	if ( BC_STS_SUCCESS != DtsStartDecoder(driver_data->hdev) )
+	{
+		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
+		goto error_CloseDecoder;
+	}
+
+	if ( BC_STS_SUCCESS != DtsStartCapture(driver_data->hdev) )
+	{
+		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
+		goto error_StopDecoder;
+	}
+
+	return vaStatus;
+
+error_StopDecoder:
+	DtsStopDecoder(driver_data->hdev);
+
+error_CloseDecoder:
+	DtsCloseDecoder(driver_data->hdev);
+
+error:
+	return vaStatus;
+}
+
 VAStatus crystalhd_begin_picture_h264(
 		VADriverContextP ctx,
 		VAContextID context,

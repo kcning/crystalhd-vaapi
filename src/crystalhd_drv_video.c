@@ -910,7 +910,6 @@ VAStatus crystalhd_CreateContext(
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_config_p obj_config;
 	int i;
-	BC_STATUS sts;
 
 	obj_config = CONFIG(config_id);
 	if (NULL == obj_config)
@@ -960,99 +959,35 @@ VAStatus crystalhd_CreateContext(
 	}
 	obj_context->flags = flag;
 
-	BC_INPUT_FORMAT bcInputFormat = {
-		.FGTEnable	= FALSE,
-		.MetaDataEnable	= FALSE,
-		.Progressive	= TRUE,
-		.OptFlags	= 0,			/* FIXME: Should we enable BD mode and max frame rate mode for LINK? */
-		.mSubtype	= BC_MSUBTYPE_INVALID,	/* set later */
-		.width		= picture_width,
-		.height		= picture_height,
-		.startCodeSz	= 4,
-		.pMetaData	= obj_context->metadata,
-		.metaDataSz	= obj_context->metadata_size,
-		.bEnableScaling	= FALSE, // TRUE if HW Scaling is desired
-		/* if we're not using HW Scaling then ScalingParams is irrelevant... */
-		.ScalingParams	= {
-			.sWidth		= 0,
-			.sHeight	= 0,
-			.DNR		= 0,	/* Palatis: what's DNR??? Do Not Resize??? */
-			.Reserved1	= 0,
-			.Reserved2	= NULL,
-			.Reserved3	= 0,
-			.Reserved4	= NULL,
-		},
-	};
-
-	// Determine if this is bitstream video (AVC1 or no start codes) or Byte stream video (H264)
-	// Determine if this is VC-1 AP or SP/MP for VC-1
 	switch (obj_config->profile) {
 		case VAProfileH264Baseline:
 		case VAProfileH264Main:
 		case VAProfileH264High:
-			bcInputFormat.mSubtype = BC_MSUBTYPE_VC1;
+			vaStatus = crystalhd_prepare_decoder_h264(ctx, obj_context);
 			break;
 #if 0
 		case VAProfileMPEG2Simple:
 		case VAProfileMPEG2Main:
-			bc_algo = BC_VID_ALGO_MPEG2;
+			vaStatus = crystalhd_prepare_decoder_mpeg2(ctx, obj_context);
 			break;
 
 		case VAProfileVC1Simple:
-			bc_algo = BC_VID_ALGO_VC1;
-			break;
-
 		case VAProfileVC1Main:
 		case VAProfileVC1Advanced:
-			bc_algo = BC_VID_ALGO_VC1MP;
+			vaStatus = crystalhd_prepare_decoder_vc1(ctx, obj_context);
 			break;
 
 		case VAProfileDivx???:
-			bc_algo = BC_VID_ALGO_DIVX;
+			vaStatus = crystalhd_prepare_decoder_divx(ctx, obj_context);
 			break;
 #endif
 		default:
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_PROFILE;
-			goto error_FreeRenderTargets;
 	}
-
-
-	/* CrystalHD specific */
-	sts = DtsOpenDecoder(driver_data->hdev, BC_STREAM_TYPE_ES);
-	if ( BC_STS_SUCCESS != sts )
-	{
-		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
+	if ( VA_STATUS_SUCCESS != vaStatus )
 		goto error_FreeRenderTargets;
-	}
-
-	sts = DtsSetInputFormat(driver_data->hdev, &bcInputFormat);
-	if ( BC_STS_SUCCESS != sts )
-	{
-		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
-		goto error_CloseDecoder;
-	}
-
-	sts = DtsStartDecoder(driver_data->hdev);
-	if ( BC_STS_SUCCESS != sts )
-	{
-		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
-		goto error_CloseDecoder;
-	}
-
-	sts = DtsStartCapture(driver_data->hdev);
-	if ( BC_STS_SUCCESS != sts )
-	{
-		vaStatus = VA_STATUS_ERROR_OPERATION_FAILED;
-		goto error_StopDecoder;
-	}
 
 	return vaStatus;
-
-error_StopDecoder:
-	DtsStopDecoder(driver_data->hdev);
-
-error_CloseDecoder:
-	DtsCloseDecoder(driver_data->hdev);
 
 error_FreeRenderTargets:
 	free(obj_context->render_targets);
