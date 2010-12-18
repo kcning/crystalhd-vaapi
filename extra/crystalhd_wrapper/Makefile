@@ -6,7 +6,7 @@ DEPS = $(SRCS:.c=.d)
 PP_OBJS = $(SRCS:.c=.preprocessed.c)
 EXE = crystalhd_wrapper.so
 
-CFLAGS = -O2 -pipe -D_GNU_SOURCE -fPIC -pthread -shared -g
+CFLAGS += -O2 -pipe -D_GNU_SOURCE -fPIC -pthread -shared -g -Wno-format
 ASTYLE_FLAGS = -y --indent-classes --indent-switches --indent-cases --indent-blocks --indent-brackets --indent-namespaces --indent-labels --indent-preprocessor --break-blocks --break-elseifs --pad=paren --pad=paren-out --indent=tab=8 --brackets=linux -n
 
 MAKEDEPEND = gcc -MM $(CFLAGS)

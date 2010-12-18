@@ -47,10 +47,13 @@ const char *string_of_BC_MEDIA_SUBTYPE(BC_MEDIA_SUBTYPE);
  * 	format	: format for printf()
  * 	...	: codes to run after function return
  */
-#define FUNC_WRAPPER(FUNCTION, RET_T, ARG_LIST, ARGS_T, ARGS, format, ...) \
+#define PRE_FUNC_CMDS_NULL	{ }
+#define POST_FUNC_CMDS_NULL	{ }
+#define FUNC_WRAPPER(FUNCTION, RET_T, ARG_LIST, ARGS_T, ARGS, format, PRE_FUNC_CMDS, POST_FUNC_CMDS) \
 	RET_T FUNCTION(LIST(ARG_LIST)) { \
 		pthread_mutex_lock( &mutex_func ); \
 		enter(format, ARGS); \
+		PRE_FUNC_CMDS; \
 		if (_indent_level < 30) \
 			++_indent_level; \
 		pthread_mutex_unlock( &mutex_func ); \
@@ -60,8 +63,8 @@ const char *string_of_BC_MEDIA_SUBTYPE(BC_MEDIA_SUBTYPE);
 		pthread_mutex_lock( &mutex_func ); \
 		if (_indent_level > 0) \
 			--_indent_level; \
+		POST_FUNC_CMDS; \
 		leave(ret); \
-		__VA_ARGS__; \
 		pthread_mutex_unlock( &mutex_func ); \
 		return ret; \
 	}
