@@ -18,6 +18,7 @@ source_x11_c = crystalhd_video_x11.c
 source_h =			\
 	bitstream.h		\
 	debug.h			\
+	crystalhd_video_mpeg2.h	\
 	crystalhd_video_h264.h	\
 	object_heap.h		\
 	crystalhd_drv_video.h	\
@@ -27,6 +28,7 @@ source_h =			\
 
 source_c =			\
 	crystalhd_drv_video.c	\
+	crystalhd_video_mpeg2.c	\
 	crystalhd_video_h264.c	\
 	x264_encoder_set.c	\
 	object_heap.c		\
