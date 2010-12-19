@@ -472,11 +472,6 @@ VAStatus crystalhd_DestroySurfaces(
 		if (!obj_surface)
 			continue;
 
-		if (obj_surface->metadata)
-			free(obj_surface->metadata);
-		if (obj_surface->data)
-			free(obj_surface->data);
-
 		object_heap_free( &driver_data->surface_heap, (object_base_p) obj_surface);
 	}
 	return VA_STATUS_SUCCESS;
