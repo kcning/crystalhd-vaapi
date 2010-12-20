@@ -42,6 +42,8 @@
 #include "crystalhd_video_mpeg2.h"
 #include "crystalhd_video_h264.h"
 
+#include <execinfo.h>
+#include <unistd.h>
 #include "debug.h"
 
 #define CONFIG_ID_OFFSET		0x01000000
@@ -600,7 +602,7 @@ VAStatus crystalhd_CreateImage(
 	if (image->num_palette_entries > 0 && image->entry_bytes > 0) {
 		obj_image->palette = malloc(image->num_palette_entries * sizeof(obj_image->palette));
 		if (!obj_image->palette)
-			goto error;
+			goto error_DestroyImage;
 	}
 
 	image->image_id = image_id;
@@ -612,9 +614,10 @@ VAStatus crystalhd_CreateImage(
 
 	return VA_STATUS_SUCCESS;
 
-error:
+error_DestroyImage:
 	crystalhd_DestroyImage(ctx, image_id);
 
+error:
 	return VA_STATUS_ERROR_OPERATION_FAILED;
 }
 
@@ -678,22 +681,34 @@ VAStatus crystalhd_GetImage(
 {
 	INIT_DRIVER_DATA;
 
+	VAStatus vaStatus = VA_STATUS_SUCCESS;
 	object_surface_p obj_surface = SURFACE(surface);
 	if (NULL == obj_surface)
 	{
-		return VA_STATUS_ERROR_INVALID_SURFACE;
+		vaStatus = VA_STATUS_ERROR_INVALID_SURFACE;
+		goto error;
 	}
 
 	object_image_p obj_output_image = IMAGE(obj_surface->output_image_id);
 	if (NULL == obj_output_image)
 	{
-		return VA_STATUS_ERROR_INVALID_IMAGE;
+		// image of surface is invalid, considered as invalid surface.
+		vaStatus = VA_STATUS_ERROR_INVALID_SURFACE;
+		goto error;
 	}
 
 	object_image_p obj_image = IMAGE(image);
 	if (NULL == obj_image)
 	{
-		return VA_STATUS_ERROR_INVALID_IMAGE;
+		vaStatus = VA_STATUS_ERROR_INVALID_IMAGE;
+		goto error;
+	}
+
+	if ( x != 0 || y != 0 || width != obj_output_image->image.width || height != obj_output_image->image.height )
+	{
+		crystalhd__error_message("GetImage() doesn't support copying of images of different size.\n");
+		vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
+		goto error;
 	}
 
 	obj_image->image.format = obj_output_image->image.format;
@@ -714,28 +729,26 @@ VAStatus crystalhd_GetImage(
 
 	object_buffer_p buf = BUFFER(obj_image->image.buf),
 			obuf = BUFFER(obj_output_image->image.buf);
-	crystalhd__information_message("0x%08x\n", obj_image->image.buf);
-	crystalhd__information_message("0x%08x\n", obj_output_image->image.buf);
-	
+
 	memcpy(	buf->buffer_data, obuf->buffer_data,
 		CRYSTALHD_MIN(obj_image->image.data_size, obj_output_image->image.data_size));
-	crystalhd__information_message("0x%08x 0x%08x\n", obj_image->image.data_size, obj_output_image->image.data_size);
-	
-	return VA_STATUS_SUCCESS;
+
+error:	
+	return vaStatus;
 }
 
 VAStatus crystalhd_PutImage(
 	VADriverContextP ctx,
 	VASurfaceID surface,
 	VAImageID image,
-	int src_x,
-	int src_y,
-	unsigned int src_width,
-	unsigned int src_height,
-	int dest_x,
-	int dest_y,
-	unsigned int dest_width,
-	unsigned int dest_height
+	int srcx,
+	int srcy,
+	unsigned int srcw,
+	unsigned int srch,
+	int destx,
+	int desty,
+	unsigned int destw,
+	unsigned int desth
 )
 {
 	INIT_DRIVER_DATA;
@@ -1072,7 +1085,7 @@ VAStatus crystalhd_CreateBuffer(
 			break;
 		default:
 			vaStatus = VA_STATUS_ERROR_UNSUPPORTED_BUFFERTYPE;
-			return vaStatus;
+			goto error;
 	}
 
 	bufferID = object_heap_allocate( &driver_data->buffer_heap );
@@ -1089,18 +1102,27 @@ VAStatus crystalhd_CreateBuffer(
 	obj_buffer->buffer_data = NULL;
 
 	vaStatus = crystalhd__allocate_buffer(obj_buffer, size * num_elements);
-	if (VA_STATUS_SUCCESS == vaStatus)
+	if (VA_STATUS_SUCCESS != vaStatus)
 	{
-		obj_buffer->element_size = size;
-		obj_buffer->num_elements = num_elements;
-		obj_buffer->max_num_elements = num_elements;
-		if (data)
-		{
-			memcpy(obj_buffer->buffer_data, data, size * num_elements);
-		}
-		*buf_id = bufferID;
+		vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
+		goto error_heap_free;
 	}
 
+	obj_buffer->element_size = size;
+	obj_buffer->num_elements = num_elements;
+	obj_buffer->max_num_elements = num_elements;
+	if (data)
+	{
+		memcpy(obj_buffer->buffer_data, data, size * num_elements);
+	}
+	*buf_id = bufferID;
+
+	return vaStatus;
+
+error_heap_free:
+	object_heap_free( &driver_data->buffer_heap, (object_base_p) obj_buffer );
+
+error:
 	return vaStatus;
 }
 
@@ -1543,11 +1565,10 @@ VAStatus crystalhd_EndPicture(
 	if ( VA_STATUS_SUCCESS != vaStatus )
 		goto error;
 
-	unsigned int width, height, width2, height2, flags;
+	unsigned int width, height, height2, flags;
 	width = obj_context->picture_width;
 	height = obj_context->picture_height;
 again:
-	width2 = (width + 1) / 2;
 	height2 = (height + 1) / 2;
 
 	VAImage image = { .image_id = VA_INVALID_ID };
@@ -1557,7 +1578,17 @@ again:
 
 	object_buffer_p obj_image_buf = BUFFER(image.buf);
 
-	BC_DTS_PROC_OUT output;
+	BC_DTS_PROC_OUT output = {
+		.Ybuff		= obj_image_buf->buffer_data,
+		.YbuffSz	= width * height,
+		.UVbuff		= obj_image_buf->buffer_data + width * height,
+		.UVbuffSz	= width * height2,
+		.PoutFlags	= BC_POUT_FLAGS_SIZE,
+		.PicInfo	= {
+			.width	= width,
+			.height	= height,
+		},
+	};
 	memset(&output, 0, sizeof(output));
 	output.PoutFlags	= BC_POUT_FLAGS_SIZE;
 	output.PicInfo.width	= width;
@@ -1565,7 +1596,7 @@ again:
 	output.Ybuff		= obj_image_buf->buffer_data;
 	output.YbuffSz		= width * height;
 	output.UVbuff		= obj_image_buf->buffer_data + output.YbuffSz;
-	output.UVbuffSz		= 2 * width2 * height2;
+	output.UVbuffSz		= width * height2;
 
 	BC_STATUS sts;
 	sts = DtsProcOutput(driver_data->hdev, DTS_OUTPUT_TIMEOUT, &output);
@@ -1597,6 +1628,8 @@ again:
 
 	// For now, assume that we are done with rendering right away
 	obj_context->current_render_target = -1;
+
+	return vaStatus;
 
 error_DestroyImage:
 	crystalhd_DestroyImage(ctx, image.image_id);
@@ -1661,8 +1694,9 @@ VAStatus crystalhd_PutSurface(
 {
 	INIT_DRIVER_DATA;
 
-//	return VA_STATUS_ERROR_UNIMPLEMENTED;
-	return VA_STATUS_SUCCESS;
+	/* TODO */
+
+	return VA_STATUS_ERROR_UNIMPLEMENTED;
 }
 
 /* 
