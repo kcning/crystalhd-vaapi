@@ -220,16 +220,18 @@ VAStatus crystalhd_end_picture_mpeg2(
 	bs_t bs, *s = &bs;
 	bs_init( s, metadata, sizeof(metadata) / sizeof(*metadata) );
 
+	// Video Metadata, things marked IGNORED is irrelevant (any value will work)
+
 	// Picture Header
 	bs_realign( s );
 	bs_write32( s, MPEG2_STARTCODE_SEQ_HDR );						// startcode
-	bs_write( s, 12, pic_param->horizontal_size );						// horizontal_size_value
-	bs_write( s, 12, pic_param->vertical_size );						// vertical_size_value
-	bs_write( s, 4, 0x01 );									// FIXME: aspect_ratio_information
-	bs_write( s, 4, 0x02 );									// FIXME: frame_rate_code
-	bs_write( s, 18, 0x001d4c );								// FIXME: bit_rate_value
+	bs_write( s, 12, pic_param->horizontal_size & 0x0fff );					// horizontal_size_value
+	bs_write( s, 12, pic_param->vertical_size & 0x0fff );					// vertical_size_value
+	bs_write( s, 4, 0x00 );									// IGNORED: aspect_ratio_information
+	bs_write( s, 4, 0x00 );									// IGNORED: frame_rate_code
+	bs_write( s, 18, 0x000000 );								// IGNORED: bit_rate_value
 	bs_write1( s, 1 );									// marker_bit (always 0x01)
-	bs_write( s, 10, 0x0070 );								// FIXME: vbv_buffer_size_value
+	bs_write( s, 10, 0x0000 );								// IGNORED: vbv_buffer_size_value
 	bs_write1( s, 0 );									// constrained_parameters_flag
 	bs_write1( s, iqmatrix->load_intra_quantiser_matrix );					// load_intra_quantiser_matrix
 	if ( iqmatrix->load_intra_quantiser_matrix )
@@ -244,40 +246,42 @@ VAStatus crystalhd_end_picture_mpeg2(
 	// Sequence Extension
 	bs_write32( s, MPEG2_STARTCODE_EXT );							// startcode
 	bs_write( s, 4, MPEG2_EXTID_SEQ_EXT );							// extension_startcode_identifier
-	bs_write( s, 8, 0x48 );									// FIXME: profile_and_level_indication
-	bs_write1( s, 0x00 );									// FIXME: progressive_sequence
-	bs_write( s, 2, 0x01 );									// FIXME: chroma_format
-	bs_write( s, 2, 0x00 );									// FIXME: horizontal_size_extension
-	bs_write( s, 2, 0x00 );									// FIXME: vertical_size_extension
-	bs_write( s, 12, 0x0000 );								// FIXME: bit_rate_extension
+	bs_write( s, 8, 0x00 );									// IGNORED: profile_and_level_indication
+	bs_write1( s, pic_param->picture_coding_extension.bits.progressive_frame );		// progressive_sequence
+	bs_write( s, 2, 0x00 );									// IGNORED: chroma_format
+	bs_write( s, 2, (pic_param->horizontal_size >> 14) & 0x03 );				// horizontal_size_extension
+	bs_write( s, 2, (pic_param->vertical_size >> 14) & 0x03 );				// vertical_size_extension
+	bs_write( s, 12, 0x0000 );								// IGNORED: bit_rate_extension
 	bs_write1( s, 0x01 );									// marker_bit (always 0x01)
-	bs_write( s, 8, 0x00 );									// FIXME: vbv_buffer_size_extension
+	bs_write( s, 8, 0x00 );									// IGNORED: vbv_buffer_size_extension
 	bs_write1( s, 0x00 );									// FIXME: low_delay
-	bs_write( s, 2, 0x00 );									// FIXME: frame_rate_extension_n
-	bs_write( s, 5, 0x00 );									// FIXME: frame_rate_extension_d
+	bs_write( s, 2, 0x00 );									// IGNORED: frame_rate_extension_n
+	bs_write( s, 5, 0x00 );									// IGNORED: frame_rate_extension_d
 	bs_flush( s );
 
 	// Sequence Display Extension
 	bs_write32( s, MPEG2_STARTCODE_EXT );							// startcode
 	bs_write( s, 4, MPEG2_EXTID_SEQ_DISP_EXT );						// extension_startcode_identifier
-	bs_write( s, 3, 0x05 );									// FIXME: video_format
-	bs_write1( s, 0x01 );									// FIXME: colour_description
+	bs_write( s, 3, 0x00 );									// IGNORED: video_format
+	bs_write1( s, 0x01 );									// colour_description
 	if ( 0x01 ) // colour_description
 	{
-		bs_write( s, 8, 0x02 );								// FIXME: colour_primaries
-		bs_write( s, 8, 0x02 );								// FIXME: transfer_characteristics
-		bs_write( s, 8, 0x02 );								// FIXME: matrix_coefficients
+		// 0x02 = Unspecified. see spec 6.3.6
+		bs_write( s, 8, 0x02 );								// colour_primaries
+		bs_write( s, 8, 0x02 );								// transfer_characteristics
+		bs_write( s, 8, 0x02 );								// matrix_coefficients
 	}
-	bs_write( s, 14, pic_param->horizontal_size );						// display_horizontal_size
+	bs_write( s, 14, pic_param->horizontal_size & 0x3fff );					// display_horizontal_size
 	bs_write1( s, 0x01 );									// marker bit (always 0x01)
-	bs_write( s, 14, pic_param->vertical_size );						// display_vertical_size
+	bs_write( s, 14, pic_param->vertical_size & 0x3fff );					// display_vertical_size
 	bs_flush( s );
 
 	// Group of Picture Header
 	bs_write32( s, MPEG2_STARTCODE_GROUP_OF_PIC );						// startcode
-	bs_write( s, 25, 0x00010000 );								// FIXME: time_code
-	bs_write1( s, 0x01 );									// closed_gop
-	bs_write1( s, 0x00 );									// broken_link
+	bs_write( s, 25, 0x00001000 );								// IGNORED: time_code (bit 13 is the marker bit)
+												//	    see 6.3.8
+	bs_write1( s, 0x01 );									// FIXME: closed_gop
+	bs_write1( s, 0x00 );									// FIXME: broken_link
 	bs_flush( s );
 
 	// Picture
@@ -307,10 +311,10 @@ VAStatus crystalhd_end_picture_mpeg2(
 	bs_write32( s, MPEG2_STARTCODE_EXT );							// startcode
 	bs_write( s, 4, MPEG2_EXTID_PIC_CODING );						// extension_startcode_identifier
 	bs_write( s, 16, pic_param->f_code );							// f_code, packed all value in one int.
-	//bs_write( s, 4, );									// f_code[0][0] /* forward horizontal */
-	//bs_write( s, 4, );									// f_code[0][1] /* forward vertical */
-	//bs_write( s, 4, );									// f_code[1][0] /* backward horizontal */
-	//bs_write( s, 4, );									// f_code[1][1] /* backward vertical */
+												// f_code[0][0] /* forward horizontal */
+												// f_code[0][1] /* forward vertical */
+												// f_code[1][0] /* backward horizontal */
+												// f_code[1][1] /* backward vertical */
 	bs_write( s, 2, pic_param->picture_coding_extension.bits.intra_dc_precision );		// intra_dc_precision
 	bs_write( s, 2, pic_param->picture_coding_extension.bits.picture_structure );		// picture_structure
 	bs_write1( s, pic_param->picture_coding_extension.bits.top_field_first );		// top_field_first
