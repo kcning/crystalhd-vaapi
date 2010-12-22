@@ -127,8 +127,8 @@ VAStatus crystalhd_render_iqmatrix_buffer_mpeg2(
 {
 	INIT_DRIVER_DATA;
 
-	if (0 != obj_context->last_iqmatrix_buffer_id)
-		crystalhd_DestroyBuffer(ctx, obj_context->last_iqmatrix_buffer_id);
+//	if (0 != obj_context->last_iqmatrix_buffer_id)
+//		crystalhd_DestroyBuffer(ctx, obj_context->last_iqmatrix_buffer_id);
 
 	obj_context->last_iqmatrix_buffer_id = obj_buffer->base.id;
 
@@ -143,8 +143,8 @@ VAStatus crystalhd_render_picture_parameter_buffer_mpeg2(
 {
 	INIT_DRIVER_DATA;
 
-	if (0 != obj_context->last_picture_param_buffer_id)
-		crystalhd_DestroyBuffer(ctx, obj_context->last_picture_param_buffer_id);
+//	if (0 != obj_context->last_picture_param_buffer_id)
+//		crystalhd_DestroyBuffer(ctx, obj_context->last_picture_param_buffer_id);
 
 	obj_context->last_picture_param_buffer_id = obj_buffer->base.id;
 
@@ -159,8 +159,8 @@ VAStatus crystalhd_render_slice_parameter_buffer_mpeg2(
 {
 	INIT_DRIVER_DATA;
 
-	if (0 != obj_context->last_slice_param_buffer_id)
-		crystalhd_DestroyBuffer(ctx, obj_context->last_slice_param_buffer_id);
+//	if (0 != obj_context->last_slice_param_buffer_id)
+//		crystalhd_DestroyBuffer(ctx, obj_context->last_slice_param_buffer_id);
 
 	obj_context->last_slice_param_buffer_id = obj_buffer->base.id;
 
@@ -324,7 +324,8 @@ VAStatus crystalhd_end_picture_mpeg2(
 	bs_write1( s, pic_param->picture_coding_extension.bits.intra_vlc_format );		// intra_vlc_format
 	bs_write1( s, pic_param->picture_coding_extension.bits.alternate_scan );		// alternate_scan
 	bs_write1( s, pic_param->picture_coding_extension.bits.repeat_first_field );		// repeat_first_field
-	bs_write1( s, 0x01 );									// FIXME: chroma_420_type
+	bs_write1( s, pic_param->picture_coding_extension.bits.progressive_frame );		// chroma_420_type, shall equal to progressive_frame
+												// see 6.3.10
 	bs_write1( s, pic_param->picture_coding_extension.bits.progressive_frame );		// progressive_frame
 	bs_write1( s, 0x00 );									// FIXME: composite_display_flag
 	if ( 0x00 ) // composite_display_flag
