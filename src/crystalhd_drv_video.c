@@ -420,22 +420,23 @@ VAStatus crystalhd_CreateSurfaces(
 	INIT_DRIVER_DATA;
 
 	VAStatus vaStatus = VA_STATUS_SUCCESS;
-	int i;
 
 	/* We only support one format */
 	if (VA_RT_FORMAT_YUV420 != format)
 	{
-		return VA_STATUS_ERROR_UNSUPPORTED_RT_FORMAT;
+		vaStatus = VA_STATUS_ERROR_UNSUPPORTED_RT_FORMAT;
+		goto error;
 	}
 
-	for (i = 0; i < num_surfaces; i++)
+	int i;
+	for (i = 0; i < num_surfaces; ++i)
 	{
 		int surfaceID = object_heap_allocate( &driver_data->surface_heap );
 		object_surface_p obj_surface = SURFACE(surfaceID);
 		if (NULL == obj_surface)
 		{
 			vaStatus = VA_STATUS_ERROR_ALLOCATION_FAILED;
-			break;
+			goto error_free;
 		}
 		obj_surface->surface_id = surfaceID;
 		obj_surface->metadata = NULL;
@@ -443,19 +444,19 @@ VAStatus crystalhd_CreateSurfaces(
 		surfaces[i] = surfaceID;
 	}
 
-	/* Error recovery */
-	if (VA_STATUS_SUCCESS != vaStatus)
+	return vaStatus;
+
+error_free:
+	/* surfaces[i-1] was the last successful allocation */
+	while ( i-- )
 	{
-		/* surfaces[i-1] was the last successful allocation */
-		for(; i--; )
-		{
-			object_surface_p obj_surface = SURFACE(surfaces[i]);
-			surfaces[i] = VA_INVALID_SURFACE;
-			assert(obj_surface);
-			object_heap_free( &driver_data->surface_heap, (object_base_p) obj_surface);
-		}
+		object_surface_p obj_surface = SURFACE(surfaces[i]);
+		surfaces[i] = VA_INVALID_SURFACE;
+		assert(obj_surface);
+		object_heap_free( &driver_data->surface_heap, (object_base_p) obj_surface);
 	}
 
+error:
 	return vaStatus;
 }
 
@@ -509,6 +510,7 @@ VAStatus crystalhd_CreateImage(
 )
 {
 	INIT_DRIVER_DATA;
+	crystalhd__information_message("%s\n", __func__);
 
 	object_image_p obj_image;
 	VAImageID image_id;
@@ -692,8 +694,8 @@ VAStatus crystalhd_GetImage(
 	object_image_p obj_output_image = IMAGE(obj_surface->output_image_id);
 	if (NULL == obj_output_image)
 	{
-		// image of surface is invalid, considered as invalid surface.
-		vaStatus = VA_STATUS_ERROR_INVALID_SURFACE;
+		// image of surface is invalid, return without error
+		vaStatus = VA_STATUS_SUCCESS;
 		goto error;
 	}
 
@@ -1263,47 +1265,6 @@ error:
 	return vaStatus;
 }
 
-#if 0
-VAStatus crystalhd_render_picture_parameter_buffer_mpeg2(
-		VADriverContextP ctx,
-		object_context_p obj_context,
-		object_buffer_p obj_buffer
-	)
-{
-	INIT_DRIVER_DATA;
-
-	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
-	/* TODO */
-	return vaStatus;
-}
-
-VAStatus crystalhd_render_picture_parameter_buffer_vc1(
-		VADriverContextP ctx,
-		object_context_p obj_context,
-		object_buffer_p obj_buffer
-	)
-{
-	INIT_DRIVER_DATA;
-
-	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
-	/* TODO */
-	return vaStatus;
-}
-
-VAStatus crystalhd_render_picture_parameter_buffer_vc1mp(
-		VADriverContextP ctx,
-		object_context_p obj_context,
-		object_buffer_p obj_buffer
-	)
-{
-	INIT_DRIVER_DATA;
-
-	VAStatus vaStatus = VA_STATUS_ERROR_UNIMPLEMENTED;
-	/* TODO */
-	return vaStatus;
-}
-#endif
-
 VAStatus crystalhd_render_iqmatrix_buffer(
 		VADriverContextP ctx,
 		object_context_p obj_context,
@@ -1474,7 +1435,6 @@ VAStatus crystalhd_RenderPicture(
 	for(i = 0; i < num_buffers; ++i)
 	{
 		object_buffer_p obj_buffer = BUFFER(buffers[i]);
-		assert(obj_buffer);
 		if (NULL == obj_buffer)
 		{
 			return VA_STATUS_ERROR_INVALID_BUFFER;
