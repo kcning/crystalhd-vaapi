@@ -21,6 +21,7 @@ source_h =			\
 	crystalhd_video_mpeg2.h	\
 	crystalhd_video_h264.h	\
 	object_heap.h		\
+	queue.h			\
 	crystalhd_drv_video.h	\
 	x264_encoder_set.h	\
 	$(source_glx_h)		\
@@ -32,6 +33,7 @@ source_c =			\
 	crystalhd_video_h264.c	\
 	x264_encoder_set.c	\
 	object_heap.c		\
+	queue.c			\
 	$(source_glx_c)		\
 	$(source_x11_c)
 
