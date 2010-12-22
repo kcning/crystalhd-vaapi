@@ -171,6 +171,16 @@ FUNC_WRAPPER(
 		eprintf("    PicInfo = { timeStamp = %llu, picture_number = %u, width = %u, height = %u, chroma_format = 0x%03x }\n",
 			(long long unsigned int)pOut->PicInfo.timeStamp, pOut->PicInfo.picture_number, pOut->PicInfo.width, pOut->PicInfo.height, pOut->PicInfo.chroma_format);
 		eprintf("}\n");
+		if (NULL != pOut->Ybuff && 0 != pOut->YbuffSz && 0 != pOut->YBuffDoneSz)
+		{
+			dump_data("pOut->Ybuff", pOut->Ybuff, pOut->YBuffDoneSz);
+			dump_to_file(pOut->Ybuff, pOut->YBuffDoneSz, "dump_DtsProcOutput_Ybuff_%016p", pOut->Ybuff);
+		}
+		if (NULL != pOut->UVbuff && 0 != pOut->UVbuffSz && 0 != pOut->UVBuffDoneSz)
+		{
+			dump_data("pOut->UVbuff", pOut->UVbuff, pOut->UVBuffDoneSz);
+			dump_to_file(pOut->UVbuff, pOut->UVBuffDoneSz, "dump_DtsProcOutput_UVbuff_%016p", pOut->UVbuff);
+		}
 	)
 );
 
@@ -195,9 +205,15 @@ FUNC_WRAPPER(
 	PRE_FUNC_CMDS_NULL,
 	LIST(
 		if (NULL != _tmp_metadata.pMetaData)
+		{
 			dump_data("Stored pMetaData", _tmp_metadata.pMetaData, _tmp_metadata.metaDataSz);
+			dump_to_file(_tmp_metadata.pMetaData, _tmp_metadata.metaDataSz, "dump_DtsProcInput_%016p", _tmp_metadata.pMetaData);
+		}
 		if (NULL != pUserData)
+		{
 			dump_data("pUserData", pUserData, ulSizeInBytes);
+			dump_to_file(pUserData, ulSizeInBytes, "dump_DtsProcInput_%016p", pUserData);
+		}
 	)
 );
 

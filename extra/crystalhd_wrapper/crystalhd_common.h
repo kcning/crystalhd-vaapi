@@ -69,14 +69,12 @@ const char *string_of_BC_MEDIA_SUBTYPE(BC_MEDIA_SUBTYPE);
 		return ret; \
 	}
 
-#define DUMP_BUFFER(BUF, SIZE, FILENAME, ...) \
+#define dump_to_file(BUF, SIZE, FILENAME, ...) \
 	do { \
 		char dump_buf_file[200] = { 0 }; \
-		sprintf(dump_buf_file, "dump_" FILENAME, __VA_ARGS__); \
+		sprintf(dump_buf_file, FILENAME, __VA_ARGS__); \
 		FILE * dump_buf = fopen(dump_buf_file, "w"); \
 		size_t wrote_bytes = fwrite(BUF, SIZE, 1, dump_buf); \
-		if (wrote_bytes < 0) \
-		crystalhd__error_message("cannot dump buffer to %s\n", dump_buf_file); \
 		fclose(dump_buf); \
 	} while (0);
 
@@ -109,7 +107,6 @@ const char *string_of_BC_MEDIA_SUBTYPE(BC_MEDIA_SUBTYPE);
 		if (i > last_startcode + 100) \
 			printf("... "); \
 		printf("(%d bytes)\n", i - last_startcode); \
-		DUMP_BUFFER(data, size, "crystalhd_wrapper-data_%016p", data); \
 	} while (0);
 
 #endif
